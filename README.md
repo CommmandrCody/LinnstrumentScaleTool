@@ -5,7 +5,7 @@ Automatically set the lights on your Linnstrument to reflect any musical scale o
 ## Three Ways to Use
 
 1. **Command Line Tool** - Simple, fast, universal (recommended)
-2. **Max for Live Device** - Perfect for Ableton Live users
+2. **Ableton MIDI Remote Script** - Automatic Ableton integration via track names
 3. **MIDI Effect Plugin** - Works with any DAW, auto-detects scales (advanced)
 
 ## Features
@@ -14,7 +14,8 @@ Automatically set the lights on your Linnstrument to reflect any musical scale o
 - **Flexible Coloring**: Root notes, scale degrees, or custom color schemes
 - **Auto-detection**: Automatically finds your Linnstrument MIDI port
 - **Configurable**: Supports custom Linnstrument tunings and layouts
-- **Multiple Interfaces**: Command-line, Max for Live, and MIDI effect
+- **Multiple Interfaces**: Command-line, Ableton MIDI Remote Script, and MIDI effect plugin
+- **Ableton Integration**: Name your tracks "C Major" and lights update automatically!
 
 ## Quick Install
 

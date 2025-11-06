@@ -24,11 +24,12 @@ Fast and simple!
 - **Time**: Instant
 - **Difficulty**: Very Easy
 
-### For Ableton Live Users → **Max for Live Device**
-Perfect integration with Ableton!
-- **See**: `max_for_live/README.md`
-- **Time**: 5 minutes to setup
-- **Difficulty**: Easy
+### For Ableton Live Users → **MIDI Remote Script**
+Perfect integration - just name your tracks!
+- **See**: `ableton_remote_script/README.md`
+- **Time**: 2 minutes to setup
+- **Difficulty**: Very Easy
+- **How**: Name tracks "C Major", select track, lights update!
 
 ### For Any DAW (Advanced) → **MIDI Effect Plugin**
 Auto-detects scales as you play!

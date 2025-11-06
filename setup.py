@@ -104,46 +104,51 @@ def test_midi_ports():
         print(f"❌ Error checking MIDI: {e}")
         return False
 
-def setup_max_for_live():
-    """Guide user through Max for Live setup"""
-    print("\nMax for Live Setup")
+def setup_ableton_remote_script():
+    """Install Ableton MIDI Remote Script"""
+    print("\nAbleton MIDI Remote Script Setup")
     print("-" * 60)
 
     system = platform.system()
 
     if system == "Darwin":  # macOS
-        target = Path.home() / "Music" / "Ableton" / "User Library" / "Presets" / "MIDI Effects" / "Max MIDI Effect"
+        target = Path.home() / "Music" / "Ableton" / "User Library" / "Remote Scripts" / "LinnstrumentScale"
     elif system == "Windows":
-        target = Path.home() / "Documents" / "Ableton" / "User Library" / "Presets" / "MIDI Effects" / "Max MIDI Effect"
+        target = Path.home() / "Documents" / "Ableton" / "User Library" / "Remote Scripts" / "LinnstrumentScale"
     else:
         print("⚠️  Unknown operating system")
         return False
 
-    source = Path(__file__).parent / "max_for_live" / "LinnstrumentScaleLight.maxpat"
+    source = Path(__file__).parent / "ableton_remote_script" / "LinnstrumentScale"
 
     print(f"Source: {source}")
     print(f"Target: {target}")
 
     if not source.exists():
-        print("❌ Max for Live device not found")
+        print("❌ MIDI Remote Script not found")
         return False
 
-    if not target.parent.exists():
+    if not target.parent.parent.exists():
         print("⚠️  Ableton User Library not found")
-        print(f"   Expected location: {target.parent}")
-        print("   You'll need to manually copy max_for_live/LinnstrumentScaleLight.maxpat")
+        print(f"   Expected location: {target.parent.parent}")
+        print("   You'll need to manually copy ableton_remote_script/LinnstrumentScale")
         return False
 
-    # Automatically install the device
+    # Automatically install the script
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(source, target)
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(source, target)
         print(f"✅ Copied to {target}")
-        print("   ⚠️  IMPORTANT: Restart Ableton Live to see the device!")
+        print("   ⚠️  IMPORTANT:")
+        print("   1. Restart Ableton Live")
+        print("   2. Go to Preferences → Link/Tempo/MIDI")
+        print("   3. Select 'LinnstrumentScale' as Control Surface")
         return True
     except Exception as e:
         print(f"❌ Copy failed: {e}")
-        print(f"   Manual copy: cp {source} {target}")
+        print(f"   Manual copy: cp -r {source} {target.parent}/")
         return False
 
 def setup_virtual_midi():
@@ -262,15 +267,15 @@ def main():
             results.append((name, False))
 
     # Optional steps
-    print_header("Max for Live Setup")
+    print_header("Ableton Integration Setup")
 
-    # Automatically attempt Max for Live setup
-    m4l_result = setup_max_for_live()
+    # Automatically attempt Ableton MIDI Remote Script setup
+    ableton_result = setup_ableton_remote_script()
 
-    if not m4l_result:
-        print("\n💡 Tip: You can manually copy the Max for Live device later:")
-        print("   max_for_live/LinnstrumentScaleLight.maxpat")
-        print("   → ~/Music/Ableton/User Library/Presets/MIDI Effects/Max MIDI Effect/")
+    if not ableton_result:
+        print("\n💡 Tip: You can manually copy the MIDI Remote Script later:")
+        print("   ableton_remote_script/LinnstrumentScale/")
+        print("   → ~/Music/Ableton/User Library/Remote Scripts/")
 
     # Summary
     print_header("Setup Summary")

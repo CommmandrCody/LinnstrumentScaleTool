@@ -79,19 +79,20 @@ chmod +x run.sh
 echo "💡 TIP: Use './run.sh C major' for quick access (auto-activates venv)"
 echo ""
 
-# Install Max for Live device if Ableton found
+# Install Ableton MIDI Remote Script if Ableton found
 if [ "$(uname)" = "Darwin" ]; then
-    M4L_DIR="$HOME/Music/Ableton/User Library/Presets/MIDI Effects/Max MIDI Effect"
-    if [ -d "$(dirname "$M4L_DIR")" ]; then
-        echo "📦 Installing Max for Live device..."
-        mkdir -p "$M4L_DIR"
-        cp max_for_live/LinnstrumentScaleLight.maxpat "$M4L_DIR/" 2>/dev/null
+    REMOTE_SCRIPTS_DIR="$HOME/Music/Ableton/User Library/Remote Scripts"
+    if [ -d "$(dirname "$REMOTE_SCRIPTS_DIR")" ]; then
+        echo "📦 Installing Ableton MIDI Remote Script..."
+        mkdir -p "$REMOTE_SCRIPTS_DIR"
+        cp -r ableton_remote_script/LinnstrumentScale "$REMOTE_SCRIPTS_DIR/" 2>/dev/null
         if [ $? -eq 0 ]; then
-            echo "✅ Max for Live device installed"
-            echo "   ⚠️  Restart Ableton Live to see the device"
+            echo "✅ MIDI Remote Script installed"
+            echo "   ⚠️  Restart Ableton Live and enable it in Preferences → Link/Tempo/MIDI"
+            echo "   ⚠️  Select 'LinnstrumentScale' as Control Surface"
         else
-            echo "⚠️  Could not install Max for Live device automatically"
-            echo "   Manual copy: cp max_for_live/LinnstrumentScaleLight.maxpat '$M4L_DIR/'"
+            echo "⚠️  Could not install MIDI Remote Script automatically"
+            echo "   Manual copy: cp -r ableton_remote_script/LinnstrumentScale '$REMOTE_SCRIPTS_DIR/'"
         fi
     fi
 fi
