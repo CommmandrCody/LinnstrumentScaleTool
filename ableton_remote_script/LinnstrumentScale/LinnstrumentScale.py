@@ -22,6 +22,13 @@ except ImportError as e:
 from _Framework.ControlSurface import ControlSurface
 from _Framework.InputControlElement import *
 
+# Import diagnostic tool
+try:
+    from .diagnostic import find_scale_properties
+    DIAGNOSTIC_AVAILABLE = True
+except ImportError:
+    DIAGNOSTIC_AVAILABLE = False
+
 # Scale name mapping from Ableton to our scale names
 ABLETON_SCALE_MAP = {
     'Major': 'major',
@@ -92,6 +99,11 @@ class LinnstrumentScale(ControlSurface):
 
         # Add listener for track changes
         self.song().view.add_selected_track_listener(self._on_track_changed)
+
+        # Run diagnostic to find scale API
+        if DIAGNOSTIC_AVAILABLE:
+            self.log_message("Running diagnostic to find scale properties...")
+            find_scale_properties(c_instance)
 
         # Initial update
         self._update_scale()
