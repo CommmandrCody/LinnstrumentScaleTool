@@ -74,6 +74,10 @@ class LinnstrumentScale(ControlSurface):
         self.current_scale = None
         self.current_root = None
 
+        # Note history for auto-detection
+        self.note_history = []
+        self.max_history = 50
+
         # Try to connect to Linnstrument
         try:
             self.linnstrument = Linnstrument()
@@ -85,6 +89,9 @@ class LinnstrumentScale(ControlSurface):
 
         # Monitor the song for scale changes
         self.song().add_current_song_time_listener(self._on_song_time_changed)
+
+        # Add listener for track changes
+        self.song().view.add_selected_track_listener(self._on_track_changed)
 
         # Initial update
         self._update_scale()
@@ -104,11 +111,18 @@ class LinnstrumentScale(ControlSurface):
         # Remove listeners
         try:
             self.song().remove_current_song_time_listener(self._on_song_time_changed)
+            self.song().view.remove_selected_track_listener(self._on_track_changed)
         except:
             pass
 
         ControlSurface.disconnect(self)
         self.log_message("Linnstrument Scale Light - Disconnected")
+
+    def _on_track_changed(self):
+        """Called when selected track changes"""
+        self.log_message("Track changed, updating scale...")
+        self.note_history = []  # Clear note history when changing tracks
+        self._update_scale()
 
     def _on_song_time_changed(self):
         """Called periodically - check if scale has changed"""
@@ -123,34 +137,65 @@ class LinnstrumentScale(ControlSurface):
             return
 
         try:
-            # Get the first track (or could monitor selected track)
-            tracks = self.song().tracks
-            if not tracks:
-                return
+            # Access Ableton's scale settings through the selected clip
+            selected_track = self.song().view.selected_track
 
-            # Check if any track has scale mode enabled
-            # Note: This is a simplified approach. Ableton's scale info
-            # is not directly accessible via the API in older versions.
-            # We'll monitor clip properties instead.
+            # Try to get clip slot with a clip
+            clip_slot = None
+            playing_slot_index = selected_track.playing_slot_index
 
-            # For now, let's use a different approach:
-            # Monitor the selected track and update based on clip properties
-            track = self.song().view.selected_track
+            if playing_slot_index >= 0:
+                clip_slot = selected_track.clip_slots[playing_slot_index]
+            else:
+                # Find first clip slot with a clip
+                for slot in selected_track.clip_slots:
+                    if slot.has_clip:
+                        clip_slot = slot
+                        break
 
-            # Try to get scale info from clip name or track name
-            # Format: "C Major" or "D minor" in track/clip name
-            scale_info = self._parse_scale_from_name(track.name)
+            if clip_slot and clip_slot.has_clip:
+                clip = clip_slot.clip
 
-            if scale_info:
-                root, scale_name = scale_info
+                # Check if clip has note properties (MIDI clip)
+                if hasattr(clip, 'get_notes'):
+                    # Try to access scale settings
+                    # In Live 11.3+, scale info is available via clip properties
+                    root = None
+                    scale_name = None
 
-                # Only update if changed
-                if root != self.current_root or scale_name != self.current_scale:
-                    self.current_root = root
-                    self.current_scale = scale_name
+                    # Try the track name approach as fallback
+                    scale_info = self._parse_scale_from_name(selected_track.name)
 
-                    self.log_message(f"Scale changed to: {NOTE_NAMES[root]} {scale_name}")
-                    self._light_scale(root, scale_name)
+                    if scale_info:
+                        root, scale_name = scale_info
+                    else:
+                        # Also check clip name
+                        scale_info = self._parse_scale_from_name(clip.name)
+                        if scale_info:
+                            root, scale_name = scale_info
+
+                    if root is not None and scale_name:
+                        # Only update if changed
+                        if root != self.current_root or scale_name != self.current_scale:
+                            self.current_root = root
+                            self.current_scale = scale_name
+
+                            self.log_message(f"Scale changed to: {NOTE_NAMES[root]} {scale_name}")
+                            self._light_scale(root, scale_name)
+            else:
+                # No clip playing, check track name
+                scale_info = self._parse_scale_from_name(selected_track.name)
+
+                if scale_info:
+                    root, scale_name = scale_info
+
+                    # Only update if changed
+                    if root != self.current_root or scale_name != self.current_scale:
+                        self.current_root = root
+                        self.current_scale = scale_name
+
+                        self.log_message(f"Scale changed to: {NOTE_NAMES[root]} {scale_name}")
+                        self._light_scale(root, scale_name)
 
         except Exception as e:
             self.log_message(f"Error updating scale: {e}")
@@ -212,5 +257,23 @@ class LinnstrumentScale(ControlSurface):
         pass
 
     def receive_midi(self, midi_bytes):
-        """Receive MIDI (required by API but not used)"""
-        pass
+        """Receive MIDI and analyze for scale detection"""
+        # Parse MIDI message
+        if len(midi_bytes) >= 3:
+            status = midi_bytes[0]
+            note = midi_bytes[1]
+            velocity = midi_bytes[2]
+
+            # Check if it's a note-on message (status 144-159)
+            if 144 <= status <= 159 and velocity > 0:
+                # Add to note history
+                pitch_class = note % 12
+                self.note_history.append(pitch_class)
+
+                # Keep history limited
+                if len(self.note_history) > self.max_history:
+                    self.note_history.pop(0)
+
+                # Try to detect scale after we have enough notes
+                if len(self.note_history) >= 5:
+                    self._detect_and_update_scale()
