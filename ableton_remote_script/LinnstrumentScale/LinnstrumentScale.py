@@ -6,13 +6,10 @@ import sys
 import os
 from pathlib import Path
 
-# Add the LinnstrumentScaleTool directory to the path
-tool_path = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(tool_path))
-
+# Import from the same directory (modules are bundled with the script)
 try:
-    from scales import get_scale_notes, note_name_to_number, NOTE_NAMES
-    from linnstrument import Linnstrument
+    from .scales import get_scale_notes, note_name_to_number, NOTE_NAMES
+    from .linnstrument import Linnstrument
     MODULES_AVAILABLE = True
 except ImportError as e:
     MODULES_AVAILABLE = False
