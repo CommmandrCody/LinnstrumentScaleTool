@@ -1,33 +1,62 @@
 # Linnstrument Scale Tool
 
-Automatically set the lights on your Linnstrument to reflect any musical scale of your choice. This tool uses MIDI CC messages to control the LED colors on each pad, making it easy to visualize scales, modes, and other musical patterns.
+Automatically light up your Linnstrument to show any musical scale. Works standalone or integrates with Ableton Live to automatically match the project's scale settings.
 
-## Three Ways to Use
+## Two Ways to Use
 
-1. **Command Line Tool** - Simple, fast, universal (recommended)
-2. **Ableton MIDI Remote Script** - Automatic Ableton integration via track names
-3. **MIDI Effect Plugin** - Works with any DAW, auto-detects scales (advanced)
+1. **Ableton Live MIDI Remote Script** - Automatic integration with Ableton's scale settings (recommended for Ableton users)
+2. **Command Line Tool** - Simple, fast, universal - works with any DAW or standalone
 
 ## Features
 
+- **Automatic Ableton Integration**: Lights update automatically when you change Ableton's scale settings
+- **Track Color Matching**: LED colors adapt based on selected track color (like Ableton Push)
 - **30+ Built-in Scales**: Major, minor, modes, pentatonics, blues, jazz, exotic scales, and more
-- **Flexible Coloring**: Root notes, scale degrees, or custom color schemes
-- **Auto-detection**: Automatically finds your Linnstrument MIDI port
+- **Supports Linnstrument 128 and 200**: Separate optimized scripts for each model
+- **Two-Color Display**: Root notes in one color, other scale notes in another
+- **Auto-detection**: Automatically finds your Linnstrument MIDI port (command-line tool)
 - **Configurable**: Supports custom Linnstrument tunings and layouts
-- **Multiple Interfaces**: Command-line, Ableton MIDI Remote Script, and MIDI effect plugin
-- **Ableton Integration**: Name your tracks "C Major" and lights update automatically!
-
-## Quick Install
-
-Run the setup script for guided installation:
-
-```bash
-python setup.py
-```
-
-Or install manually:
 
 ## Installation
+
+### Option 1: Ableton Live MIDI Remote Script (Recommended for Ableton Users)
+
+This provides seamless integration with Ableton Live - lights update automatically when you change the scale!
+
+1. **Choose your Linnstrument model:**
+   - For **Linnstrument 128** (16 columns): Use `LinnstrumentScale128`
+   - For **Linnstrument 200** (26 columns): Use `LinnstrumentScale200`
+
+2. **Copy the appropriate folder to your Ableton Remote Scripts directory:**
+
+   **macOS:**
+   ```bash
+   cp -r ableton_remote_script/LinnstrumentScale128 ~/Music/Ableton/User\ Library/Remote\ Scripts/
+   ```
+
+   **Windows:**
+   ```
+   Copy ableton_remote_script\LinnstrumentScale128 to:
+   %USERPROFILE%\Documents\Ableton\User Library\Remote Scripts\
+   ```
+
+3. **Configure your Linnstrument:**
+   - Press bottom-left pad and note what MIDI note it plays
+   - Edit `LinnstrumentScale.py` line 99 and set `LINNSTRUMENT_BASE_NOTE` to that note number
+   - Common values: 36 (C2, Push-style), 48 (C3, factory default), 40 (E2, guitar tuning)
+
+4. **Enable in Ableton:**
+   - Open Ableton Live Preferences > Link/Tempo/MIDI
+   - In the MIDI Ports section, find your Linnstrument
+   - Under "Control Surface", select "LinnstrumentScale128" (or 200)
+   - Under "Input", select your Linnstrument MIDI port
+   - Under "Output", select your Linnstrument MIDI port
+
+5. **Done!** Now when you change Ableton's scale (Cmd+Shift+S or Preferences > Scales), your Linnstrument lights will update automatically!
+
+### Option 2: Command Line Tool
+
+For standalone use or with other DAWs:
 
 1. Make sure you have Python 3.7+ installed
 2. Install dependencies:
@@ -44,7 +73,22 @@ chmod +x scale_tool.py
 
 ## Quick Start
 
-### Basic Usage
+### Ableton Live Integration
+
+Once installed, the script works automatically:
+
+1. **Change Scale**: Press Cmd+Shift+S (Mac) or Ctrl+Shift+S (Windows) to open Scale settings
+2. **Select Root & Scale**: Choose your root note and scale type
+3. **Watch Lights Update**: Your Linnstrument LEDs automatically update to show the scale!
+
+**Track Colors**: The LED colors adapt based on your selected track's color in Ableton, similar to how Push works.
+
+**What You'll See**:
+- Brighter color for root notes
+- Related color for other scale notes
+- Colors change with track selection
+
+### Command Line Tool Usage
 
 Light up a C major scale:
 ```bash
@@ -209,21 +253,42 @@ The tool calculates which pads on the Linnstrument correspond to notes in your c
 
 ## Troubleshooting
 
-### "No Linnstrument MIDI port found"
+### Ableton Integration Issues
 
+**LEDs not lighting up in Ableton:**
+1. Check that "LinnstrumentScale128" (or 200) is selected as Control Surface in Ableton MIDI preferences
+2. Make sure both Input and Output are set to your Linnstrument MIDI port
+3. Check the Ableton Log.txt file for error messages (Help > Show Log)
+4. Verify Global Settings button on Linnstrument is lit (yellow = User Firmware Mode active)
+5. Restart Ableton Live after installing the script
+
+**Wrong pads lighting up:**
+1. Verify you're using the correct script (LinnstrumentScale128 for 16 columns, LinnstrumentScale200 for 26 columns)
+2. Check the `LINNSTRUMENT_BASE_NOTE` setting matches your Linnstrument configuration
+   - Press bottom-left pad and note the MIDI note number
+   - Edit line 99 in `LinnstrumentScale.py` to match
+3. Verify row offset is set correctly (line 104):
+   - Most common: 5 semitones (fourths, like Push)
+   - Guitar tuning: 5 semitones
+   - Factory default: 5 semitones
+
+**Global Settings button not turning yellow:**
+- The script sends NRPN 245=1 to enable User Firmware Mode
+- If it doesn't activate, try manually: Press and hold "OS Update" in Global Settings for half a second
+
+### Command Line Tool Issues
+
+**"No Linnstrument MIDI port found":**
 1. Make sure your Linnstrument is connected via USB
 2. Check that it appears in your system's MIDI devices
 3. Run `python scale_tool.py --list-ports` to see available ports
 4. If it appears with a different name, use `--port "exact name"`
 
-### LEDs not lighting up
-
+**LEDs not lighting up:**
 1. Make sure your Linnstrument firmware is up to date
-2. Check that MIDI CC is enabled in your Linnstrument settings
-3. Try clearing all lights first: `python scale_tool.py --clear`
+2. Try clearing all lights first: `python scale_tool.py --clear`
 
-### Wrong notes are lighting up
-
+**Wrong notes are lighting up:**
 1. Check your Linnstrument tuning settings
 2. Adjust `--row-offset` and `--column-offset` to match your configuration
 3. Default is: row offset = 5 semitones, column offset = 1 semitone

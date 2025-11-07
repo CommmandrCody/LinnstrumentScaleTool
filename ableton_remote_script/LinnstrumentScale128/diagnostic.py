@@ -36,7 +36,7 @@ def find_scale_properties(c_instance):
     log_func = c_instance.log_message
 
     log_func("\n" + "="*60)
-    log_func("DIAGNOSTIC MODE - Searching for Scale Properties")
+    log_func("DIAGNOSTIC MODE - Searching for Scale & Color Properties")
     log_func("="*60)
 
     song = c_instance.song()
@@ -68,12 +68,23 @@ def find_scale_properties(c_instance):
     # Check selected track
     log_func("\n### Checking Selected Track ###")
     track = view.selected_track
+    color_related = []
     for attr in dir(track):
         if 'scale' in attr.lower() or 'note' in attr.lower():
             try:
                 value = getattr(track, attr)
                 scale_related.append((attr, type(value).__name__))
                 log_func(f"  FOUND: track.{attr} - {type(value).__name__}")
+            except:
+                pass
+        if 'color' in attr.lower():
+            try:
+                value = getattr(track, attr)
+                color_related.append((attr, type(value).__name__))
+                log_func(f"  FOUND: track.{attr} - {type(value).__name__}")
+                # Try to get the actual color value
+                if not callable(value):
+                    log_func(f"    VALUE: {value}")
             except:
                 pass
 
@@ -95,6 +106,10 @@ def find_scale_properties(c_instance):
 
     log_func(f"\n### SUMMARY: Found {len(scale_related)} scale-related properties ###")
     for attr, attr_type in scale_related:
+        log_func(f"  - {attr} ({attr_type})")
+
+    log_func(f"\n### SUMMARY: Found {len(color_related)} color-related properties ###")
+    for attr, attr_type in color_related:
         log_func(f"  - {attr} ({attr_type})")
 
     log_func("\n" + "="*60)
