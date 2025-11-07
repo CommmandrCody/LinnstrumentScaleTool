@@ -79,6 +79,11 @@ class LinnstrumentScale(ControlSurface):
         self.current_root = None
         self.current_track_color = None
 
+        # Track selection row feature (DISABLED - conflicts with isomorphic layout)
+        # The same notes appear on multiple rows, making it impossible to detect
+        # which physical pad was pressed. Use Push for track selection instead.
+        self.track_row_enabled = False  # Set to True to enable (experimental)
+
         # Note history for auto-detection
         self.note_history = []
         self.max_history = 50
@@ -118,6 +123,9 @@ class LinnstrumentScale(ControlSurface):
         # Add listener for track changes
         self.song().view.add_selected_track_listener(self._on_track_changed)
 
+        # Add listener for track list changes (tracks added/removed/color changed)
+        self.song().add_tracks_listener(self._on_tracks_changed)
+
         # CRITICAL: Enable LED User Firmware Mode via NRPN
         self.log_message("=== ENABLING LED USER FIRMWARE MODE ===")
         # Send NRPN 245 = 1 to enable User Firmware Mode
@@ -148,6 +156,7 @@ class LinnstrumentScale(ControlSurface):
             self.song().remove_root_note_listener(self._on_scale_changed)
             self.song().remove_scale_name_listener(self._on_scale_changed)
             self.song().view.remove_selected_track_listener(self._on_track_changed)
+            self.song().remove_tracks_listener(self._on_tracks_changed)
         except:
             pass
 
@@ -156,9 +165,14 @@ class LinnstrumentScale(ControlSurface):
 
     def _on_track_changed(self):
         """Called when selected track changes"""
-        self.log_message("Track changed, updating scale...")
+        self.log_message("Track changed, updating scale and track row...")
         self.note_history = []  # Clear note history when changing tracks
         self._update_scale()
+
+    def _on_tracks_changed(self):
+        """Called when tracks are added/removed or track properties change"""
+        self.log_message("Track list changed, updating track row...")
+        self._update_scale()  # This will update both scale and track row
 
     def _on_scale_changed(self):
         """Called when scale or root note changes"""
@@ -281,6 +295,68 @@ class LinnstrumentScale(ControlSurface):
             # Default/White
             return {'root': 'white', 'other': 'blue'}
 
+    def _light_track_row(self):
+        """Light the top row (row 7) with track colors for track selection"""
+        if not self.track_row_enabled:
+            return
+
+        try:
+            song = self.song()
+            tracks = song.tracks  # Get all tracks (not return track or master)
+            selected_track = song.view.selected_track
+
+            # Get selected track index
+            selected_index = -1
+            try:
+                selected_index = list(tracks).index(selected_track)
+            except ValueError:
+                pass  # Selected track is not in the regular tracks (might be return/master)
+
+            # Light up to 16 tracks on the top row
+            for column in range(min(16, len(tracks))):
+                track = tracks[column]
+                color = 'off'
+
+                if hasattr(track, 'color') and track.color is not None:
+                    # Map Ableton track color to Linnstrument color
+                    ableton_color = track.color
+                    r = (ableton_color >> 16) & 0xFF
+                    g = (ableton_color >> 8) & 0xFF
+                    b = ableton_color & 0xFF
+
+                    # Map to closest Linnstrument color
+                    if r > g and r > b:
+                        color = 'red' if r > 200 else 'orange'
+                    elif g > r and g > b:
+                        color = 'green' if g > 200 else 'lime'
+                    elif b > r and b > g:
+                        color = 'blue' if b > 200 else 'cyan'
+                    elif r > 150 and g > 150 and b < 100:
+                        color = 'yellow'
+                    elif r > 150 and b > 150:
+                        color = 'magenta'
+                    elif g > 150 and b > 150:
+                        color = 'cyan'
+                    else:
+                        color = 'white'
+                else:
+                    color = 'white'
+
+                # Highlight selected track with brighter color
+                if column == selected_index:
+                    # Selected track gets white to stand out
+                    color = 'white'
+
+                # Set the LED for this track
+                self.linnstrument.set_cell_color(column, 7, color)  # Row 7 = top row
+
+            # Turn off remaining pads if fewer than 16 tracks
+            for column in range(len(tracks), 16):
+                self.linnstrument.set_cell_color(column, 7, 'off')
+
+        except Exception as e:
+            self.log_message(f"Error lighting track row: {e}")
+
     def _light_scale(self, root, scale_name, track_color=None):
         """Update Linnstrument lights with the scale"""
         try:
@@ -320,7 +396,14 @@ class LinnstrumentScale(ControlSurface):
             self.log_message(f"Scale pitch class numbers: {pitch_classes}")
 
             # Pass the root pitch class explicitly so it doesn't get confused after filtering
-            self.linnstrument.light_scale(scale_notes, root_color, scale_color, root_pitch_class=root)
+            # Skip top row if track selection row is enabled
+            self.linnstrument.light_scale(scale_notes, root_color, scale_color,
+                                        root_pitch_class=root,
+                                        skip_top_row=self.track_row_enabled)
+
+            # Light the track selection row (top row)
+            if self.track_row_enabled:
+                self._light_track_row()
 
             self.show_message(f"Linnstrument: {root_name} {scale_name}")
 
@@ -328,24 +411,47 @@ class LinnstrumentScale(ControlSurface):
             self.log_message(f"Error lighting scale: {e}")
 
     def build_midi_map(self, midi_map_handle):
-        """Build MIDI map (required by API but not used)"""
-        pass
+        """Build MIDI map to receive MIDI from top row"""
+        if not self.linnstrument or not self.track_row_enabled:
+            return
+
+        # Import MIDI map functions
+        import Live
+
+        # Calculate top row note range
+        base_note = self.linnstrument.base_note
+        row_offset = self.linnstrument.row_offset
+        top_row_start = base_note + (7 * row_offset)
+        top_row_end = top_row_start + 16  # 16 columns
+
+        # Forward all top row notes to receive_midi
+        script_handle = self._c_instance.handle()
+        for note in range(top_row_start, top_row_end):
+            Live.MidiMap.forward_midi_note(script_handle, midi_map_handle, 0, note)
+            self.log_message(f"Forwarding MIDI note {note} to receive_midi")
 
     def update_display(self):
         """Update display (required by API but not used)"""
         pass
 
     def receive_midi(self, midi_bytes):
-        """Receive MIDI and analyze for scale detection"""
+        """Receive MIDI and handle track selection from top row"""
         # Parse MIDI message
         if len(midi_bytes) >= 3:
             status = midi_bytes[0]
             note = midi_bytes[1]
             velocity = midi_bytes[2]
 
+
             # Check if it's a note-on message (status 144-159)
             if 144 <= status <= 159 and velocity > 0:
-                # Add to note history
+                # Check if this note is from the top row (row 7)
+                if self.track_row_enabled and self._is_top_row_note(note):
+                    self.log_message(f"Top row note detected: {note}")
+                    self._handle_track_selection(note)
+                    return  # Don't pass through to note history
+
+                # Add to note history for scale detection
                 pitch_class = note % 12
                 self.note_history.append(pitch_class)
 
@@ -356,3 +462,56 @@ class LinnstrumentScale(ControlSurface):
                 # Try to detect scale after we have enough notes
                 if len(self.note_history) >= 5:
                     self._detect_and_update_scale()
+
+    def _is_top_row_note(self, note):
+        """Check if a MIDI note is from the top row (row 7)"""
+        if not self.linnstrument:
+            return False
+
+        # Get the actual position of this note
+        positions = self.linnstrument.get_position_for_note(note)
+
+        # Check if ANY of the positions for this note are on row 7
+        for column, row in positions:
+            if row == 7:  # Top row
+                return True
+
+        return False
+
+    def _handle_track_selection(self, note):
+        """Select track based on which pad in the top row was pressed"""
+        try:
+            # Get the position(s) of this note
+            positions = self.linnstrument.get_position_for_note(note)
+
+            # Find the position that's on row 7
+            column = None
+            for col, row in positions:
+                if row == 7:
+                    column = col
+                    break
+
+            if column is None:
+                self.log_message(f"Note {note} is not on top row")
+                return
+
+            self.log_message(f"Track selection: note={note}, column={column}")
+
+            # Get tracks
+            tracks = list(self.song().tracks)
+            self.log_message(f"Total tracks: {len(tracks)}")
+
+            # Select the track if it exists
+            if 0 <= column < len(tracks):
+                track = tracks[column]
+                self.log_message(f"Attempting to select track {column + 1}: {track.name}")
+                self.song().view.selected_track = track
+                self.log_message(f"Successfully selected track {column + 1}: {track.name}")
+                # Scale will update automatically via _on_track_changed listener
+            else:
+                self.log_message(f"Column {column} out of range (0-{len(tracks)-1})")
+
+        except Exception as e:
+            self.log_message(f"Error selecting track: {e}")
+            import traceback
+            self.log_message(f"Traceback: {traceback.format_exc()}")

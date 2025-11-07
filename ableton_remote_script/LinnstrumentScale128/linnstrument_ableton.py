@@ -143,13 +143,14 @@ class LinnstrumentAbletonMIDI:
 
         return positions
 
-    def clear_all_lights(self):
+    def clear_all_lights(self, skip_top_row=False):
         """Turn off all LEDs"""
-        for row in range(LINNSTRUMENT_ROWS):
+        max_row = LINNSTRUMENT_ROWS - 1 if skip_top_row else LINNSTRUMENT_ROWS
+        for row in range(max_row):
             for column in range(LINNSTRUMENT_COLUMNS):
                 self.set_cell_color(column, row, 'off')
 
-    def light_note(self, note, color):
+    def light_note(self, note, color, skip_top_row=False):
         """Light up all cells that play a specific note"""
         positions = self.get_position_for_note(note)
 
@@ -163,9 +164,12 @@ class LinnstrumentAbletonMIDI:
                 self.c_instance.log_message(f"  Verify: position ({col},{row}) calculates to note {calc_note}")
 
         for column, row in positions:
+            # Skip row 7 (top row) if requested
+            if skip_top_row and row == 7:
+                continue
             self.set_cell_color(column, row, color)
 
-    def light_scale(self, scale_notes, root_color='red', scale_color='blue', root_pitch_class=None):
+    def light_scale(self, scale_notes, root_color='red', scale_color='blue', root_pitch_class=None, skip_top_row=False):
         """
         Light up all notes in a scale
 
@@ -174,9 +178,10 @@ class LinnstrumentAbletonMIDI:
             root_color: Color for root notes
             scale_color: Color for other scale notes
             root_pitch_class: The actual root pitch class (0-11), if known
+            skip_top_row: If True, don't clear or light row 7 (reserved for track selection)
         """
-        # Clear all lights first
-        self.clear_all_lights()
+        # Clear all lights first (optionally skip top row)
+        self.clear_all_lights(skip_top_row=skip_top_row)
 
         # Get root note pitch class
         if not scale_notes:
@@ -211,7 +216,7 @@ class LinnstrumentAbletonMIDI:
             # Use root color for root notes, scale color for others
             is_root = (note % 12) == root_note
             color = root_color if is_root else scale_color
-            self.light_note(note, color)
+            self.light_note(note, color, skip_top_row=skip_top_row)
 
     def light_scale_with_degrees(self, scale_notes, color_map=None):
         """
