@@ -1,6 +1,20 @@
-# MIDI Effect Plugin for Linnstrument Scale Lighting
+# MIDI Passthrough Plugin (Experimental)
 
-A standalone Python MIDI effect that sits between your DAW and Linnstrument, automatically updating the lights based on scales.
+> **Note:** This is an experimental tool. For Ableton Live users, we strongly recommend using the [Ableton MIDI Remote Script](../ableton_remote_script/) instead, which provides automatic integration with zero setup complexity.
+
+A standalone Python MIDI passthrough effect that sits between your DAW and Linnstrument, automatically updating the lights based on scales.
+
+**Why use the Ableton script instead:**
+- No MIDI routing setup needed
+- Reads Ableton's scale settings directly
+- Track color integration
+- Zero latency
+- Much simpler installation
+
+**When to use this tool:**
+- You're not using Ableton Live
+- You want automatic scale detection from played notes
+- You need a DAW-agnostic solution
 
 ## Two Modes
 
