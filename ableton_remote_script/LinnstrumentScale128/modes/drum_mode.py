@@ -467,12 +467,8 @@ class DrumMode(BaseMode):
             # With chromatic layout (row_offset=4), notes can appear at multiple positions
             # e.g., note 40 at both (col=4, row=0) and (col=0, row=1)
             # Prefer the position with the lowest row (actual pad location)
-            if len(positions) > 1:
-                self.log_message(f"Note {note} found at multiple positions: {positions}")
             positions_sorted = sorted(positions, key=lambda p: (p[1], p[0]))  # Sort by row, then column
             column, row = positions_sorted[0]
-            if len(positions) > 1:
-                self.log_message(f"Selected position (row={row}, col={column}) from {len(positions)} options")
 
             # Check if in drum pad area (bottom 4 rows, ONLY 4 columns like Push)
             if row < DRUM_PAD_ROWS and column < DRUM_PAD_COLUMNS:
@@ -481,21 +477,16 @@ class DrumMode(BaseMode):
                     pad_index = row * 4 + column
                     if pad_index != self._selected_pad:
                         self._selected_pad = pad_index
-                        self.log_message(f"Selected drum pad {pad_index} (row={row}, col={column})")
                         # Update sequencer to show this pad's sequence
                         self._update_sequencer_leds()
                         # Update drum pad LEDs to show selection
                         self._update_drum_pad_leds()
 
-                # Re-send the note to the track so it plays
-                # (forwarded notes are intercepted, so we must re-send them)
-                status = 0x90 if is_note_on else 0x80  # Note on/off, channel 1
-                self.linnstrument.send_midi([status, note, velocity])
-                return True  # We handled it (by re-sending)
+                # Let note pass through to track naturally
+                return False
 
             # Check if in sequencer area (rows 4-7)
             elif row >= DRUM_PAD_ROWS:
-                self.log_message(f"Sequencer press: col={column}, row={row}")
                 if is_note_on:
                     self._handle_sequencer_press(column, row)
                 return True  # Intercept sequencer presses
