@@ -300,23 +300,7 @@ class LinnstrumentScale(ControlSurface):
             Live.MidiMap.forward_midi_cc(script_handle, midi_map_handle,
                                         MODE_SWITCH_CHANNEL, MODE_SWITCH_CC)
             self.log_message(f"Forwarding CC{MODE_SWITCH_CC} (mode switch) to receive_midi")
-
-            # In drum mode, forward ONLY bank buttons (row 4, columns 0-1)
-            if self._current_mode_index == MODE_DRUM:
-                base_note = self.linnstrument.base_note
-                # Bank buttons at row 4 (first sequencer row), columns 0-1
-                # Row 4 with row_offset=4: base + (4 * 4) + col
-                bank_left = base_note + 16  # Row 4, column 0
-                bank_right = base_note + 17  # Row 4, column 1
-                Live.MidiMap.forward_midi_note(script_handle, midi_map_handle, 0, bank_left)
-                Live.MidiMap.forward_midi_note(script_handle, midi_map_handle, 0, bank_right)
-                self.log_message(f"Drum mode: Forwarding bank buttons {bank_left}, {bank_right} (row 4, cols 0-1)")
-                self.log_message("Drum pads (rows 0-3, cols 0-3) pass through to track")
-
-            # In keyboard mode, we can optionally forward notes for translation
-            # For now, let all notes pass through
-            else:
-                self.log_message("All notes pass through to track")
+            self.log_message("All notes pass through to track")
 
         except Exception as e:
             self.log_message(f"Error building MIDI map: {e}")
