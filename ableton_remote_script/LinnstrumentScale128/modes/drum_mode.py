@@ -31,6 +31,7 @@ class DrumMode(BaseMode):
 
         # Pad selection
         self._selected_pad = 0  # 0-63
+        self._pad_bank_offset = 0  # Bank offset for pagination (0, 16, 32, 48)
 
         # Sequencer state - 64 pads x 16 steps
         # Format: _sequences[pad_index][step_index] = velocity (0 = off, 1-127 = on)
@@ -226,7 +227,8 @@ class DrumMode(BaseMode):
         """Track changed - find new drum rack"""
         self.log_message("Track changed")
         self._find_drum_rack()
-        self.update_leds()
+        # Don't auto-update LEDs on track change
+        # self.update_leds()
 
     def _on_playback_changed(self):
         """Playback started/stopped"""
@@ -238,7 +240,8 @@ class DrumMode(BaseMode):
         else:
             self._current_step = 0
 
-        self.update_leds()
+        # Don't clear everything on playback change
+        # self.update_leds()
 
     def _on_song_time_changed(self):
         """Song position changed - update sequencer playhead"""
@@ -324,23 +327,36 @@ class DrumMode(BaseMode):
             self.log_message(f"Error updating drum mode LEDs: {e}")
 
     def _update_drum_pad_leds(self):
-        """Update drum pad LED colors - 4x4 grid LIKE PUSH"""
-        # Simple 4x4 grid showing pads 0-15 (notes 36-51)
-        # Just like Push - no extended columns, just 4x4
+        """Update drum pad LED colors - 4x4 grid with bank offset"""
+        # 4x4 grid showing pads based on current bank offset
 
-        for row in range(DRUM_PAD_ROWS):
-            for col in range(DRUM_PAD_COLUMNS):  # Only 4 columns like Push
-                # Simple mapping: pad_index = row * 4 + col
-                pad_index = row * 4 + col
+        try:
+            for row in range(DRUM_PAD_ROWS):
+                for col in range(DRUM_PAD_COLUMNS):  # Only 4 columns like Push
+                    # Add bank offset to get actual pad index
+                    pad_index = (row * 4 + col) + self._pad_bank_offset
 
-                # Get color based on whether this pad has a sample
-                color = self._get_drum_pad_color(pad_index)
-                self.led_manager.set_led(col, row, color)
+                    # Get color based on whether this pad has a sample
+                    color = self._get_drum_pad_color(pad_index)
+                    self.led_manager.set_led(col, row, color)
 
-        # Turn off columns 4-15 (we only use 4x4 like Push)
-        for row in range(DRUM_PAD_ROWS):
-            for col in range(4, 16):
-                self.led_manager.set_led(col, row, 'off')
+            # Light up bank buttons (row 4, columns 0-1)
+            # Left button - dim if at first bank, bright otherwise
+            left_color = 'blue' if self._pad_bank_offset > 0 else 'cyan'
+            self.led_manager.set_led(0, 4, left_color)
+
+            # Right button - dim if at last bank, bright otherwise
+            right_color = 'blue' if self._pad_bank_offset + 16 < 64 else 'cyan'
+            self.led_manager.set_led(1, 4, right_color)
+
+            # Turn off other columns in drum pad rows
+            for row in range(DRUM_PAD_ROWS):
+                for col in range(4, 16):
+                    self.led_manager.set_led(col, row, 'off')
+        except Exception as e:
+            self.log_message(f"Error in _update_drum_pad_leds: {e}")
+            import traceback
+            self.log_message(traceback.format_exc())
 
     def _get_drum_pad_color(self, pad_index):
         """
@@ -370,14 +386,17 @@ class DrumMode(BaseMode):
 
                     # Check if pad has a sample
                     if hasattr(drum_pad, 'chains') and len(drum_pad.chains) > 0:
-                        # Has sample - show as green (will add track color later)
+                        # Has sample - show as green
                         return 'green'
+                    else:
+                        # No sample but show dimly
+                        return 'blue'
 
             except Exception as e:
                 self.log_message(f"Error getting drum pad {pad_index} color: {e}")
 
-        # No sample - hide it
-        return 'off'
+        # No drum rack - show all pads dimly
+        return 'blue'
 
     def _update_sequencer_leds(self):
         """Update sequencer LED display - show selected pad's sequence (LIKE PUSH)"""
@@ -460,41 +479,66 @@ class DrumMode(BaseMode):
             False (let notes pass through to track)
         """
         try:
+            self.log_message(f"=== handle_note called: note={note}, vel={velocity}, is_note_on={is_note_on} ===")
+
             positions = self.get_grid_position(note)
+            self.log_message(f"  All positions for note {note}: {positions}")
+
             if not positions:
+                self.log_message(f"  No positions found - passing through")
                 return False  # Pass through
 
             # With chromatic layout (row_offset=4), notes can appear at multiple positions
             # e.g., note 40 at both (col=4, row=0) and (col=0, row=1)
-            # Prefer the position with the lowest row (actual pad location)
-            if len(positions) > 1:
-                self.log_message(f"Note {note} found at multiple positions: {positions}")
-            positions_sorted = sorted(positions, key=lambda p: (p[1], p[0]))  # Sort by row, then column
+            # PREFER drum pad positions (columns 0-3) over bank buttons (columns 4-5)
+            drum_pad_positions = [(c, r) for c, r in positions if c < 4]
+            self.log_message(f"  Drum pad positions (col<4): {drum_pad_positions}")
+
+            if drum_pad_positions:
+                # Use drum pad position
+                positions_sorted = sorted(drum_pad_positions, key=lambda p: (p[1], p[0]))
+                self.log_message(f"  Using drum pad position")
+            else:
+                # No drum pad position, use whatever we have (bank buttons)
+                positions_sorted = sorted(positions, key=lambda p: (p[1], p[0]))
+                self.log_message(f"  No drum pad position, using all positions")
+
             column, row = positions_sorted[0]
-            if len(positions) > 1:
-                self.log_message(f"Selected position (row={row}, col={column}) from {len(positions)} options")
+            self.log_message(f"  SELECTED: row={row} col={column}")
+
+            # Check for bank buttons (row 4, columns 0-1)
+            if row == 4 and column <= 1:
+                self.log_message(f"  >>> BANK BUTTON DETECTED <<<")
+                if is_note_on:
+                    if column == 0:
+                        # Left bank button
+                        if self._pad_bank_offset > 0:
+                            self._pad_bank_offset -= 16
+                            self.show_message(f"Drum Bank {self._pad_bank_offset // 16}")
+                            self.log_message(f"Bank left: offset now {self._pad_bank_offset}")
+                            self._update_drum_pad_leds()
+                        else:
+                            self.show_message("Drum Bank 0 (first)")
+                    elif column == 1:
+                        # Right bank button
+                        if self._pad_bank_offset + 16 < 64:
+                            self._pad_bank_offset += 16
+                            self.show_message(f"Drum Bank {self._pad_bank_offset // 16}")
+                            self.log_message(f"Bank right: offset now {self._pad_bank_offset}")
+                            self._update_drum_pad_leds()
+                        else:
+                            self.show_message("Drum Bank 3 (last)")
+                return True  # Intercept bank buttons
 
             # Check if in drum pad area (bottom 4 rows, ONLY 4 columns like Push)
             if row < DRUM_PAD_ROWS and column < DRUM_PAD_COLUMNS:
-                if is_note_on:
-                    # Select this pad when pressed
-                    pad_index = row * 4 + column
-                    if pad_index != self._selected_pad:
-                        self._selected_pad = pad_index
-                        self.log_message(f"Selected drum pad {pad_index} (row={row}, col={column})")
-                        # Update sequencer to show this pad's sequence
-                        self._update_sequencer_leds()
-                        # Update drum pad LEDs to show selection
-                        self._update_drum_pad_leds()
-
-                # Re-send the note to the track so it plays
-                # (forwarded notes are intercepted, so we must re-send them)
-                status = 0x90 if is_note_on else 0x80  # Note on/off, channel 1
-                self.linnstrument.send_midi([status, note, velocity])
-                return True  # We handled it (by re-sending)
+                self.log_message(f"  >>> DRUM PAD - passing through <<<")
+                # Just let the pad play - don't track selection or update LEDs
+                return False
 
             # Check if in sequencer area (rows 4-7)
             elif row >= DRUM_PAD_ROWS:
+                self.log_message(f"  >>> SEQUENCER AREA <<<")
                 self.log_message(f"Sequencer press: col={column}, row={row}")
                 if is_note_on:
                     self._handle_sequencer_press(column, row)
