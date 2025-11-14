@@ -1,24 +1,15 @@
 """
-Main MIDI Remote Script for Linnstrument Multi-Mode System
-Supports 3 modes: Keyboard, Session, and Drum Sequencer
+Main MIDI Remote Script for Linnstrument Scale Light
 """
 
 import sys
 import os
 from pathlib import Path
 
-# Import configuration
+# Import from the same directory (modules are bundled with the script)
 try:
-    from .config import (
-        MODE_KEYBOARD, MODE_SESSION, MODE_DRUM, MODE_COUNT,
-        MODE_SWITCH_CC, MODE_SWITCH_CHANNEL, MODE_COLORS,
-        LINNSTRUMENT_BASE_NOTE, LINNSTRUMENT_ROW_OFFSET, LINNSTRUMENT_COLUMN_OFFSET,
-        NRPN_USER_FIRMWARE_MODE, NRPN_ENABLE_VALUE
-    )
-    from .scales import NOTE_NAMES
+    from .scales import get_scale_notes, note_name_to_number, NOTE_NAMES
     from .linnstrument_ableton import LinnstrumentAbletonMIDI
-    from .led_manager import LEDManager
-    from .modes import KeyboardMode, SessionMode, DrumMode
     MODULES_AVAILABLE = True
 except ImportError as e:
     MODULES_AVAILABLE = False
@@ -27,354 +18,465 @@ except ImportError as e:
 # Ableton Live API
 from _Framework.ControlSurface import ControlSurface
 from _Framework.InputControlElement import *
-import Live
+
+# Import diagnostic tool
+try:
+    from .diagnostic import find_scale_properties
+    DIAGNOSTIC_AVAILABLE = True
+except ImportError:
+    DIAGNOSTIC_AVAILABLE = False
+
+# Scale name mapping from Ableton to our scale names
+ABLETON_SCALE_MAP = {
+    'Major': 'major',
+    'Minor': 'minor',
+    'Dorian': 'dorian',
+    'Mixolydian': 'mixolydian',
+    'Lydian': 'lydian',
+    'Phrygian': 'phrygian',
+    'Locrian': 'locrian',
+    'Diminished': 'diminished',
+    'Whole Half': 'diminished',
+    'Whole Tone': 'whole_tone',
+    'Minor Blues': 'blues',
+    'Minor Pentatonic': 'minor_pentatonic',
+    'Major Pentatonic': 'major_pentatonic',
+    'Harmonic Minor': 'harmonic_minor',
+    'Melodic Minor': 'melodic_minor',
+    'Super Locrian': 'altered',
+    'Bhairav': 'double_harmonic',
+    'Hungarian Minor': 'hungarian_minor',
+    'Minor Gypsy': 'hungarian_minor',
+    'Hirojoshi': 'japanese',
+    'In-Sen': 'japanese',
+    'Iwato': 'japanese',
+    'Kumoi': 'japanese',
+    'Pelog': 'japanese',
+    'Spanish': 'spanish',
+}
 
 
 class LinnstrumentScale(ControlSurface):
     """
-    Multi-mode MIDI Remote Script for LinnStrument
-    - Keyboard Mode: Scale lighting (original functionality)
-    - Session Mode: Clip launcher grid
-    - Drum Mode: Drum pads + step sequencer
+    MIDI Remote Script that monitors Ableton's scale settings
+    and updates Linnstrument lights accordingly
     """
 
     def __init__(self, c_instance):
         ControlSurface.__init__(self, c_instance)
 
-        self.log_message("=" * 60)
-        self.log_message("Linnstrument Multi-Mode System - Starting...")
-        self.log_message("=" * 60)
+        self.log_message("Linnstrument Scale Light - Starting...")
 
         # Check if modules are available
         if not MODULES_AVAILABLE:
-            self.log_message(f"ERROR: Could not import modules: {IMPORT_ERROR}")
-            self.show_message("Linnstrument: Import Error - Check Log")
+            self.log_message(f"ERROR: Could not import scale modules: {IMPORT_ERROR}")
+            self.log_message(f"Tool path: {tool_path}")
+            self.show_message("Linnstrument Scale: Import Error - Check Log")
             return
 
-        # Core components
         self.linnstrument = None
-        self.led_manager = None
+        self.current_scale = None
+        self.current_root = None
+        self.current_track_color = None
 
-        # Mode system
-        self._current_mode_index = MODE_KEYBOARD
-        self._modes = {}
-        self._active_mode = None
+        # Track selection row feature
+        self.track_row_enabled = True  # Toggle this to enable/disable track selection row
 
-        # Initialize LinnStrument MIDI controller
+        # Note history for auto-detection
+        self.note_history = []
+        self.max_history = 50
+
+        # Initialize Linnstrument MIDI controller
         try:
+            # ============================================================
+            # CONFIGURATION: Set your Linnstrument's bottom-left note here
+            # ============================================================
+            # Press the bottom-left pad on your Linnstrument and check what MIDI note it plays.
+            # Common values:
+            #   30 = F#1 (custom low tuning)
+            #   36 = C2  (Push-style)
+            #   40 = E2  (guitar tuning)
+            #   48 = C3  (factory default)
+            #
+            # Set YOUR value here:
+            LINNSTRUMENT_BASE_NOTE = 36  # C2 - matches Push  # <<< CHANGE THIS to match your Linnstrument!
+
             self.linnstrument = LinnstrumentAbletonMIDI(
                 c_instance,
                 base_note=LINNSTRUMENT_BASE_NOTE,
-                row_offset=LINNSTRUMENT_ROW_OFFSET,
-                column_offset=LINNSTRUMENT_COLUMN_OFFSET
+                row_offset=5,      # Semitones per row (standard = 5)
+                column_offset=1    # Semitones per column (always 1)
             )
             self.log_message("Linnstrument MIDI controller initialized")
-            self.log_message(f"Config: base_note={LINNSTRUMENT_BASE_NOTE}, "
-                           f"row_offset={LINNSTRUMENT_ROW_OFFSET}, "
-                           f"column_offset={LINNSTRUMENT_COLUMN_OFFSET}")
-
+            self.log_message(f"Linnstrument config: base_note={LINNSTRUMENT_BASE_NOTE}, row_offset=5, column_offset=1")
+            self.show_message("Linnstrument Scale: Ready")
         except Exception as e:
-            self.log_message(f"ERROR: Could not initialize Linnstrument: {e}")
-            self.show_message("Linnstrument: Initialization Error")
-            return
+            self.log_message(f"Warning: Could not initialize Linnstrument: {e}")
+            self.show_message("Linnstrument Scale: Initialization Error")
 
-        # Initialize LED Manager
-        try:
-            self.led_manager = LEDManager(self.linnstrument, c_instance)
-            self.log_message("LED Manager initialized")
-        except Exception as e:
-            self.log_message(f"ERROR: Could not initialize LED Manager: {e}")
-            return
+        # Add listeners for scale changes
+        self.song().add_root_note_listener(self._on_scale_changed)
+        self.song().add_scale_name_listener(self._on_scale_changed)
 
-        # Initialize modes
-        try:
-            song = self.song()
-            self._modes = {
-                MODE_KEYBOARD: KeyboardMode(c_instance, self.linnstrument, self.led_manager, song),
-                MODE_SESSION: SessionMode(c_instance, self.linnstrument, self.led_manager, song),
-                MODE_DRUM: DrumMode(c_instance, self.linnstrument, self.led_manager, song),
-            }
-            self.log_message("All modes initialized")
-        except Exception as e:
-            self.log_message(f"ERROR: Could not initialize modes: {e}")
-            import traceback
-            self.log_message(traceback.format_exc())
-            return
-
-        # Enable LED User Firmware Mode via NRPN
-        self._enable_user_firmware_mode()
-
-        # Add listener for track selection changes
+        # Add listener for track changes
         self.song().view.add_selected_track_listener(self._on_track_changed)
 
-        # Auto-select appropriate mode based on current track
-        self._auto_switch_mode()
+        # Add listener for track list changes (tracks added/removed/color changed)
+        self.song().add_tracks_listener(self._on_tracks_changed)
 
-        self.log_message("=" * 60)
-        self.log_message("Linnstrument Multi-Mode System - Ready!")
-        self.log_message("Auto-switches to Drum Mode when Drum Rack detected")
-        self.log_message("Press Switch 1 (CC65) to manually cycle modes")
-        self.log_message("=" * 60)
-        self.show_message("Linnstrument: Multi-Mode Ready")
+        # CRITICAL: Enable LED User Firmware Mode via NRPN
+        self.log_message("=== ENABLING LED USER FIRMWARE MODE ===")
+        # Send NRPN 245 = 1 to enable User Firmware Mode
+        # NRPN format: CC99 (MSB), CC98 (LSB), CC6 (data MSB), CC38 (data LSB)
+        channel = 0  # Channel 1 (0-indexed)
+        status = 0xB0 + channel
+
+        c_instance.send_midi((status, 99, 0))    # NRPN MSB = 0
+        c_instance.send_midi((status, 98, 245))  # NRPN LSB = 245
+        c_instance.send_midi((status, 6, 0))     # Data MSB = 0
+        c_instance.send_midi((status, 38, 1))    # Data LSB = 1 (enable)
+
+        self.log_message("Sent NRPN 245=1 to enable User Firmware Mode")
+        self.log_message("Global Settings button should now be lit YELLOW")
+        self.log_message("")
+
+        # Initial scale update
+        self._update_scale()
+
+        self.log_message("Linnstrument Scale Light - Ready!")
 
     def disconnect(self):
         """Called when the script is unloaded"""
-        self.log_message("Linnstrument Multi-Mode System - Disconnecting...")
+        self.log_message("Linnstrument Scale Light - Disconnecting...")
 
-        # Exit current mode
-        if self._active_mode:
-            self._active_mode.exit()
+        # Remove listeners
+        try:
+            self.song().remove_root_note_listener(self._on_scale_changed)
+            self.song().remove_scale_name_listener(self._on_scale_changed)
+            self.song().view.remove_selected_track_listener(self._on_track_changed)
+            self.song().remove_tracks_listener(self._on_tracks_changed)
+        except:
+            pass
 
-        # Clean up
         ControlSurface.disconnect(self)
-        self.log_message("Linnstrument Multi-Mode System - Disconnected")
-
-    def _enable_user_firmware_mode(self):
-        """Enable LinnStrument User Firmware Mode for LED control"""
-        try:
-            self.log_message("Enabling LED User Firmware Mode...")
-
-            # Send NRPN 245 = 1 to enable User Firmware Mode
-            # NRPN format: CC99 (MSB), CC98 (LSB), CC6 (data MSB), CC38 (data LSB)
-            channel = MODE_SWITCH_CHANNEL
-            status = 0xB0 + channel
-
-            self._c_instance.send_midi((status, 99, 0))    # NRPN MSB = 0
-            self._c_instance.send_midi((status, 98, NRPN_USER_FIRMWARE_MODE))  # NRPN LSB = 245
-            self._c_instance.send_midi((status, 6, 0))     # Data MSB = 0
-            self._c_instance.send_midi((status, 38, NRPN_ENABLE_VALUE))    # Data LSB = 1 (enable)
-
-            self.log_message("User Firmware Mode enabled (Global Settings button should be YELLOW)")
-
-        except Exception as e:
-            self.log_message(f"Error enabling User Firmware Mode: {e}")
-
-    def _switch_to_mode(self, mode_index):
-        """
-        Switch to a different mode
-
-        Args:
-            mode_index: MODE_KEYBOARD, MODE_SESSION, or MODE_DRUM
-        """
-        try:
-            if mode_index not in self._modes:
-                self.log_message(f"Invalid mode index: {mode_index}")
-                return
-
-            # Exit current mode
-            if self._active_mode:
-                self._active_mode.exit()
-
-            # Force clear all LEDs between modes to prevent ghosting
-            self.led_manager.clear_all()
-            self.log_message("Cleared all LEDs during mode switch")
-
-            # Switch to new mode
-            self._current_mode_index = mode_index
-            self._active_mode = self._modes[mode_index]
-            self._active_mode.enter()
-
-            # Rebuild MIDI map for new mode
-            self.request_rebuild_midi_map()
-
-            # Log mode switch
-            mode_names = {
-                MODE_KEYBOARD: "Keyboard",
-                MODE_SESSION: "Session",
-                MODE_DRUM: "Drum Sequencer"
-            }
-            self.log_message(f"Switched to {mode_names.get(mode_index, 'Unknown')} Mode")
-
-        except Exception as e:
-            self.log_message(f"Error switching to mode {mode_index}: {e}")
-            import traceback
-            self.log_message(traceback.format_exc())
-
-    def _cycle_mode(self):
-        """Cycle to next mode"""
-        next_mode = (self._current_mode_index + 1) % MODE_COUNT
-        self._switch_to_mode(next_mode)
-
-    def _translate_drum_note(self, note):
-        """
-        Translate drum pad notes from row_offset=5 to chromatic (row_offset=4)
-
-        With row_offset=5, 4x4 grid produces: 36-39, 41-44, 46-49, 51-54
-        We want chromatic: 36-39, 40-43, 44-47, 48-51
-
-        Args:
-            note: Input MIDI note number
-
-        Returns:
-            Translated MIDI note number
-        """
-        # Translation map
-        translation = {
-            # Row 0: no change
-            36: 36, 37: 37, 38: 38, 39: 39,
-            # Row 1: subtract 1
-            41: 40, 42: 41, 43: 42, 44: 43,
-            # Row 2: subtract 2
-            46: 44, 47: 45, 48: 46, 49: 47,
-            # Row 3: subtract 3
-            51: 48, 52: 49, 53: 50, 54: 51,
-        }
-        return translation.get(note, note)
+        self.log_message("Linnstrument Scale Light - Disconnected")
 
     def _on_track_changed(self):
-        """Called when track selection changes - auto-detect drum rack"""
+        """Called when selected track changes"""
+        self.log_message("Track changed, updating scale and track row...")
+        self.note_history = []  # Clear note history when changing tracks
+        self._update_scale()
+
+    def _on_tracks_changed(self):
+        """Called when tracks are added/removed or track properties change"""
+        self.log_message("Track list changed, updating track row...")
+        self._update_scale()  # This will update both scale and track row
+
+    def _on_scale_changed(self):
+        """Called when scale or root note changes"""
+        self.log_message("Scale changed, updating Linnstrument...")
+        self._update_scale()
+
+    def _update_scale(self):
+        """Check Ableton's scale settings and update Linnstrument"""
+        if not self.linnstrument:
+            return
+
         try:
-            self._auto_switch_mode()
+            song = self.song()
+
+            # Get scale settings from Ableton's song object
+            root = song.root_note  # 0-11 (C to B)
+            scale_name = song.scale_name  # String like "Major", "Minor", etc.
+
+            # Get track color
+            selected_track = song.view.selected_track
+            track_color = None
+            if hasattr(selected_track, 'color'):
+                track_color = selected_track.color
+
+            # Check if anything changed
+            scale_changed = (root != self.current_root or scale_name != self.current_scale)
+            color_changed = (track_color != self.current_track_color)
+
+            if scale_changed or color_changed:
+                self.current_root = root
+                self.current_scale = scale_name
+                self.current_track_color = track_color
+
+                # Map Ableton scale name to our scale name
+                our_scale_name = ABLETON_SCALE_MAP.get(scale_name, scale_name.lower().replace(' ', '_'))
+
+                self.log_message(f"Scale changed to: {NOTE_NAMES[root]} {scale_name} (track color: {track_color})")
+                self._light_scale(root, our_scale_name, track_color)
+
         except Exception as e:
-            self.log_message(f"Error in track change handler: {e}")
+            self.log_message(f"Error updating scale: {e}")
 
-    def _auto_switch_mode(self):
-        """Automatically switch to Drum Mode if drum rack detected"""
-        try:
-            track = self.song().view.selected_track
-
-            # Check if track has a drum rack
-            if hasattr(track, 'devices'):
-                for device in track.devices:
-                    if device.class_name == 'DrumGroupDevice':
-                        self.log_message(f"Drum rack detected: {device.name} - auto-switching to Drum Mode")
-                        self._switch_to_mode(MODE_DRUM)
-                        return
-
-            # No drum rack found - switch to keyboard mode if currently in drum mode
-            if self._current_mode_index == MODE_DRUM:
-                self.log_message("No drum rack - auto-switching to Keyboard Mode")
-                self._switch_to_mode(MODE_KEYBOARD)
-
-        except Exception as e:
-            self.log_message(f"Error in auto mode switch: {e}")
-
-    def _translate_to_chromatic(self, note):
+    def _parse_scale_from_name(self, name):
         """
-        Translate LinnStrument note (with row_offset=5) to chromatic for drum rack
-
-        The LinnStrument grid (row_offset=5):
-        Row 0: 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
-        Row 1: 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56
-        Row 2: 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61
-        Row 3: 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66
-
-        We want to map the 4x4 grid to chromatic: 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
-
-        Args:
-            note: Incoming MIDI note from LinnStrument
-
-        Returns:
-            Chromatic note number for drum rack, or None if not in drum pad area
+        Parse scale info from track/clip name
+        Expected format: "C Major", "D minor", etc.
         """
-        try:
-            # Get position on grid
-            positions = self.linnstrument.get_position_for_note(note)
-            if not positions:
-                return None
-
-            column, row = positions[0]
-
-            # Only translate drum pad area (bottom 4 rows, 4 columns)
-            if row < 4 and column < 4:
-                # Map to chromatic: row * 4 + column
-                chromatic_index = row * 4 + column
-                chromatic_note = 36 + chromatic_index
-                return chromatic_note
-
-            # Not in drum pad area - don't translate
+        if not name:
             return None
 
-        except Exception as e:
-            self.log_message(f"Error translating note {note}: {e}")
+        parts = name.strip().split()
+        if len(parts) < 2:
             return None
+
+        # Try to find note name
+        note_name = parts[0].upper()
+        if note_name not in NOTE_NAMES and note_name not in ['DB', 'EB', 'GB', 'AB', 'BB']:
+            return None
+
+        # Convert flat notation
+        flat_map = {'DB': 'C#', 'EB': 'D#', 'GB': 'F#', 'AB': 'G#', 'BB': 'A#'}
+        note_name = flat_map.get(note_name, note_name)
+
+        # Get scale name
+        scale_part = ' '.join(parts[1:])
+        scale_name = ABLETON_SCALE_MAP.get(scale_part)
+
+        if not scale_name:
+            # Try lowercase match
+            scale_name = scale_part.lower().replace(' ', '_')
+
+        try:
+            root = note_name_to_number(note_name)
+            return (root, scale_name)
+        except:
+            return None
+
+    def _map_ableton_color_to_linnstrument(self, ableton_color):
+        """Map Ableton track color (RGB int) to Linnstrument root/scale colors"""
+        if ableton_color is None:
+            # Default: red for root, blue for other scale notes
+            return {'root': 'red', 'other': 'blue'}
+
+        # Ableton colors are RGB integers (0-16777215)
+        # Extract RGB components
+        r = (ableton_color >> 16) & 0xFF
+        g = (ableton_color >> 8) & 0xFF
+        b = ableton_color & 0xFF
+
+        # Map to closest Linnstrument color based on dominant RGB channel
+        # Use bright color for root, dimmer/related color for other scale notes
+        if r > g and r > b:
+            # Red dominant
+            if r > 200 and g < 100:
+                return {'root': 'red', 'other': 'pink'}
+            else:
+                return {'root': 'orange', 'other': 'yellow'}
+        elif g > r and g > b:
+            # Green dominant
+            if g > 200:
+                return {'root': 'green', 'other': 'lime'}
+            else:
+                return {'root': 'lime', 'other': 'green'}
+        elif b > r and b > g:
+            # Blue dominant
+            if b > 200:
+                return {'root': 'blue', 'other': 'cyan'}
+            else:
+                return {'root': 'cyan', 'other': 'blue'}
+        elif r > 150 and g > 150 and b < 100:
+            # Yellow
+            return {'root': 'yellow', 'other': 'lime'}
+        elif r > 150 and b > 150:
+            # Magenta
+            return {'root': 'magenta', 'other': 'pink'}
+        elif g > 150 and b > 150:
+            # Cyan
+            return {'root': 'cyan', 'other': 'blue'}
+        else:
+            # Default/White
+            return {'root': 'white', 'other': 'blue'}
+
+    def _light_track_row(self):
+        """Light the top row (row 7) with track colors for track selection"""
+        if not self.track_row_enabled:
+            return
+
+        try:
+            song = self.song()
+            tracks = song.tracks  # Get all tracks (not return track or master)
+            selected_track = song.view.selected_track
+
+            # Get selected track index
+            selected_index = -1
+            try:
+                selected_index = list(tracks).index(selected_track)
+            except ValueError:
+                pass  # Selected track is not in the regular tracks (might be return/master)
+
+            # Light up to 16 tracks on the top row
+            for column in range(min(16, len(tracks))):
+                track = tracks[column]
+                color = 'off'
+
+                if hasattr(track, 'color') and track.color is not None:
+                    # Map Ableton track color to Linnstrument color
+                    ableton_color = track.color
+                    r = (ableton_color >> 16) & 0xFF
+                    g = (ableton_color >> 8) & 0xFF
+                    b = ableton_color & 0xFF
+
+                    # Map to closest Linnstrument color
+                    if r > g and r > b:
+                        color = 'red' if r > 200 else 'orange'
+                    elif g > r and g > b:
+                        color = 'green' if g > 200 else 'lime'
+                    elif b > r and b > g:
+                        color = 'blue' if b > 200 else 'cyan'
+                    elif r > 150 and g > 150 and b < 100:
+                        color = 'yellow'
+                    elif r > 150 and b > 150:
+                        color = 'magenta'
+                    elif g > 150 and b > 150:
+                        color = 'cyan'
+                    else:
+                        color = 'white'
+                else:
+                    color = 'white'
+
+                # Highlight selected track with brighter color
+                if column == selected_index:
+                    # Selected track gets white to stand out
+                    color = 'white'
+
+                # Set the LED for this track
+                self.linnstrument.set_cell_color(column, 7, color)  # Row 7 = top row
+
+            # Turn off remaining pads if fewer than 16 tracks
+            for column in range(len(tracks), 16):
+                self.linnstrument.set_cell_color(column, 7, 'off')
+
+        except Exception as e:
+            self.log_message(f"Error lighting track row: {e}")
+
+    def _light_scale(self, root, scale_name, track_color=None):
+        """Update Linnstrument lights with the scale"""
+        try:
+            # Get scale notes, but only in the Linnstrument's actual range
+            # Linnstrument 128: 16 columns x 8 rows
+            # Linnstrument 200: 26 columns x 8 rows
+            # Calculate range based on base_note and grid size
+            from .linnstrument_ableton import LINNSTRUMENT_COLUMNS, LINNSTRUMENT_ROWS
+            min_note = self.linnstrument.base_note
+            max_note = self.linnstrument.base_note + (LINNSTRUMENT_COLUMNS * 1) + (LINNSTRUMENT_ROWS * 5)
+
+            # Generate all scale notes
+            all_scale_notes = get_scale_notes(root, scale_name)
+
+            # Filter to only notes in Linnstrument range
+            scale_notes = [note for note in all_scale_notes if min_note <= note <= max_note]
+
+            # Get color map based on track color
+            color_scheme = self._map_ableton_color_to_linnstrument(track_color)
+
+            # Use simple two-color scheme: root color for root, other color for rest of scale
+            # This makes it easy to see which notes are the root
+            root_color = color_scheme['root']
+            scale_color = color_scheme['other']
+
+            # Log detailed info for debugging
+            root_name = NOTE_NAMES[root]
+            self.log_message(f"=== Lighting {root_name} {scale_name} scale ===")
+            self.log_message(f"Root pitch class: {root} ({root_name})")
+            self.log_message(f"Total scale notes across all octaves: {len(scale_notes)}")
+            self.log_message(f"First 20 scale notes: {scale_notes[:20]}")
+
+            # Show which pitch classes are in the scale
+            pitch_classes = sorted(set(note % 12 for note in scale_notes))
+            pitch_class_names = [NOTE_NAMES[pc] for pc in pitch_classes]
+            self.log_message(f"Scale pitch classes ({len(pitch_classes)}): {pitch_class_names}")
+            self.log_message(f"Scale pitch class numbers: {pitch_classes}")
+
+            # Pass the root pitch class explicitly so it doesn't get confused after filtering
+            # Skip top row if track selection row is enabled
+            self.linnstrument.light_scale(scale_notes, root_color, scale_color,
+                                        root_pitch_class=root,
+                                        skip_top_row=self.track_row_enabled)
+
+            # Light the track selection row (top row)
+            if self.track_row_enabled:
+                self._light_track_row()
+
+            self.show_message(f"Linnstrument: {root_name} {scale_name}")
+
+        except Exception as e:
+            self.log_message(f"Error lighting scale: {e}")
 
     def build_midi_map(self, midi_map_handle):
-        """Build MIDI map to receive MIDI from LinnStrument"""
-        try:
-            import Live
-
-            script_handle = self._c_instance.handle()
-
-            # Forward mode switch CC
-            Live.MidiMap.forward_midi_cc(script_handle, midi_map_handle,
-                                        MODE_SWITCH_CHANNEL, MODE_SWITCH_CC)
-            self.log_message(f"Forwarding CC{MODE_SWITCH_CC} (mode switch) to receive_midi")
-            self.log_message("All notes pass through to track")
-
-        except Exception as e:
-            self.log_message(f"Error building MIDI map: {e}")
-            import traceback
-            self.log_message(traceback.format_exc())
-
-    def receive_midi(self, midi_bytes):
-        """
-        Receive MIDI and route to active mode
-
-        Args:
-            midi_bytes: Tuple of MIDI bytes (status, data1, data2)
-        """
-        try:
-            if len(midi_bytes) < 3:
-                return
-
-            status = midi_bytes[0]
-            data1 = midi_bytes[1]
-            data2 = midi_bytes[2]
-
-            # Check for mode switch CC
-            if 0xB0 <= status <= 0xBF:  # Control Change
-                channel = status & 0x0F
-                cc_number = data1
-                value = data2
-
-                if channel == MODE_SWITCH_CHANNEL and cc_number == MODE_SWITCH_CC:
-                    # Mode switch button pressed (only trigger on value > 0)
-                    if value > 0:
-                        self.log_message(f"Mode switch CC received (CC{cc_number}={value})")
-                        self._cycle_mode()
-                    return
-
-                # Pass CC to active mode
-                if self._active_mode and hasattr(self._active_mode, 'handle_cc'):
-                    if self._active_mode.handle_cc(cc_number, value):
-                        return  # Mode handled it
-
-            # Check for note on/off
-            elif 0x80 <= status <= 0x9F:  # Note On or Note Off
-                channel = status & 0x0F
-                note = data1
-                velocity = data2
-
-                # Determine if note on or off
-                is_note_on = (status & 0xF0) == 0x90 and velocity > 0
-
-                # Debug: log all notes in drum mode
-                if self._current_mode_index == MODE_DRUM and is_note_on:
-                    # Calculate which row/column this note is on
-                    positions = self.linnstrument.get_position_for_note(note)
-                    if positions:
-                        col, row = positions[0]
-                        self.log_message(f"receive_midi: note={note} row={row} col={col} vel={velocity}")
-                    else:
-                        self.log_message(f"receive_midi: note={note} (unknown position) vel={velocity}")
-
-                # Pass to active mode
-                if self._active_mode and hasattr(self._active_mode, 'handle_note'):
-                    self._active_mode.handle_note(note, velocity, is_note_on)
-
-        except Exception as e:
-            self.log_message(f"Error in receive_midi: {e}")
-            import traceback
-            self.log_message(traceback.format_exc())
+        """Build MIDI map (required by API but not used)"""
+        pass
 
     def update_display(self):
-        """
-        Called periodically by Ableton
-        Update active mode
-        """
+        """Update display (required by API but not used)"""
+        pass
+
+    def receive_midi(self, midi_bytes):
+        """Receive MIDI and handle track selection from top row"""
+        # Parse MIDI message
+        if len(midi_bytes) >= 3:
+            status = midi_bytes[0]
+            note = midi_bytes[1]
+            velocity = midi_bytes[2]
+
+            # Check if it's a note-on message (status 144-159)
+            if 144 <= status <= 159 and velocity > 0:
+                # Check if this note is from the top row (row 7)
+                if self.track_row_enabled and self._is_top_row_note(note):
+                    self._handle_track_selection(note)
+                    return  # Don't pass through to note history
+
+                # Add to note history for scale detection
+                pitch_class = note % 12
+                self.note_history.append(pitch_class)
+
+                # Keep history limited
+                if len(self.note_history) > self.max_history:
+                    self.note_history.pop(0)
+
+                # Try to detect scale after we have enough notes
+                if len(self.note_history) >= 5:
+                    self._detect_and_update_scale()
+
+    def _is_top_row_note(self, note):
+        """Check if a MIDI note is from the top row (row 7)"""
+        if not self.linnstrument:
+            return False
+
+        # Calculate which row this note is on
+        base_note = self.linnstrument.base_note
+        row_offset = self.linnstrument.row_offset
+
+        # Top row notes are base_note + (row 7 * row_offset) + column_offset
+        # For base_note=36, row_offset=5: row 7 starts at note 71 (36 + 35)
+        top_row_start = base_note + (7 * row_offset)
+        top_row_end = top_row_start + 16  # 16 columns
+
+        return top_row_start <= note < top_row_end
+
+    def _handle_track_selection(self, note):
+        """Select track based on which pad in the top row was pressed"""
         try:
-            if self._active_mode:
-                self._active_mode.update()
+            # Calculate which column was pressed
+            base_note = self.linnstrument.base_note
+            row_offset = self.linnstrument.row_offset
+            top_row_start = base_note + (7 * row_offset)
+
+            column = note - top_row_start  # 0-15 for Linnstrument 128
+
+            # Get tracks
+            tracks = list(self.song().tracks)
+
+            # Select the track if it exists
+            if 0 <= column < len(tracks):
+                self.song().view.selected_track = tracks[column]
+                self.log_message(f"Selected track {column + 1}: {tracks[column].name}")
+                # Scale will update automatically via _on_track_changed listener
+
         except Exception as e:
-            self.log_message(f"Error in update_display: {e}")
+            self.log_message(f"Error selecting track: {e}")
