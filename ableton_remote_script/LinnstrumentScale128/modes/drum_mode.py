@@ -201,26 +201,8 @@ class DrumMode(BaseMode):
 
     def _on_note_played(self):
         """Note played on track - update pad selection"""
-        try:
-            track = self.song.view.selected_track
-            if hasattr(track, 'playing_notes'):
-                notes = track.playing_notes
-                if notes and len(notes) > 0:
-                    # Get most recent note
-                    note = notes[-1][0] if isinstance(notes[-1], tuple) else notes[-1]
-
-                    # Convert note to pad index (note 36 = pad 0, note 51 = pad 15)
-                    if note >= 36 and note <= 51:
-                        pad_index = note - 36
-                        if pad_index < 16:  # Only first 16 pads (4x4)
-                            old_selected = self._selected_pad
-                            self._selected_pad = pad_index
-                            self.log_message(f"Note listener: selected pad {pad_index} from note {note}")
-                            if old_selected != self._selected_pad:
-                                self._update_drum_pad_leds()
-                                self._update_sequencer_leds()
-        except Exception as e:
-            self.log_message(f"Error in note listener: {e}")
+        # DISABLED - this listener fires continuously and causes note repeating
+        pass
 
     def _on_track_changed(self):
         """Track changed - find new drum rack"""
