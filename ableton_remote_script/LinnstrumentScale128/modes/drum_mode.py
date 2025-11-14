@@ -454,17 +454,7 @@ class DrumMode(BaseMode):
 
             # Check if in drum pad area (bottom 4 rows, ONLY 4 columns like Push)
             if row < DRUM_PAD_ROWS and column < DRUM_PAD_COLUMNS:
-                if is_note_on:
-                    # Select this pad when pressed
-                    pad_index = row * 4 + column
-                    if pad_index != self._selected_pad:
-                        self._selected_pad = pad_index
-                        # Update sequencer to show this pad's sequence
-                        self._update_sequencer_leds()
-                        # Update drum pad LEDs to show selection
-                        self._update_drum_pad_leds()
-
-                # Let note pass through to track naturally
+                # Let note pass through to track naturally - NO LED UPDATES HERE
                 return False
 
             # Check if in sequencer area (rows 4-7)
