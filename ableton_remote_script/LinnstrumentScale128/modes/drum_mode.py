@@ -320,8 +320,8 @@ class DrumMode(BaseMode):
             # Update drum pads (bottom 4 rows)
             self._update_drum_pad_leds()
 
-            # Update sequencer (top 4 rows)
-            self._update_sequencer_leds()
+            # Don't update sequencer for now - just drum pads
+            # self._update_sequencer_leds()
 
         except Exception as e:
             self.log_message(f"Error updating drum mode LEDs: {e}")
