@@ -2,43 +2,98 @@
 
 ## Overview
 
-A complete toolset for automatically controlling Linnstrument LED lights to display musical scales. Built with Python and available in multiple interfaces to suit different workflows.
+A complete multi-mode control system for LinnStrument with Ableton Live. Includes three powerful modes: Keyboard (scale lighting), Session (clip launcher), and Drum (integrated sequencer). Built with Python and fully integrated with Ableton's Remote Script API.
 
 ## Project Structure
 
 ```
 LinnstrumentScaleTool/
-├── Core Python Modules
+├── Ableton Remote Scripts (Multi-Mode System)
+│   ├── ableton_remote_script/
+│   │   ├── LinnstrumentScale128/          # LinnStrument 128 (16 cols)
+│   │   │   ├── LinnstrumentScale.py       # Main controller
+│   │   │   ├── config.py                  # Configuration
+│   │   │   ├── led_manager.py             # LED control system
+│   │   │   ├── scales.py                  # 30+ scale definitions
+│   │   │   ├── linnstrument_ableton.py    # MIDI interface
+│   │   │   └── modes/                     # Mode system
+│   │   │       ├── base_mode.py           # Abstract base class
+│   │   │       ├── keyboard_mode.py       # Scale lighting
+│   │   │       ├── session_mode.py        # Clip launcher
+│   │   │       └── drum_mode.py           # Drum pads + sequencer
+│   │   └── LinnstrumentScale200/          # LinnStrument 200 (25 cols)
+│
+├── Core Python Modules (Standalone Tools)
 │   ├── scales.py                    # 30+ scale definitions
 │   ├── linnstrument.py              # MIDI LED control
 │   └── scale_tool.py                # Command-line interface
 │
-├── Max for Live Device
-│   ├── max_for_live/
-│   │   ├── LinnstrumentScaleLight.maxpat   # M4L device
-│   │   ├── linnstrument_scale_light.py     # Python backend
-│   │   └── README.md                       # M4L documentation
-│
-├── MIDI Effect Plugin
-│   ├── vst_plugin/
-│   │   ├── midi_effect_plugin.py           # Standalone MIDI effect
-│   │   └── README.md                       # Plugin documentation
-│
 ├── Documentation
-│   ├── README.md                    # Full documentation
-│   ├── QUICK_START.md              # Quick start guide
-│   ├── PROJECT_SUMMARY.md          # This file
-│   └── examples.py                 # Interactive examples
+│   ├── MULTIMODE_README.md          # Multi-mode system guide
+│   ├── HARDWARE_SETUP.md            # Hardware configuration
+│   ├── README.md                    # Original tool documentation
+│   ├── PROJECT_SUMMARY.md           # This file
+│   └── examples.py                  # Interactive examples
 │
 └── Setup
-    ├── setup.py                    # Guided installation
-    ├── requirements.txt            # Python dependencies
-    └── .gitignore                  # Git ignore rules
+    ├── install_multimode.sh         # Multi-mode installer
+    ├── install.sh                   # Original installer
+    └── requirements.txt             # Python dependencies
 ```
 
 ## Components
 
-### 1. Core Library (`scales.py`, `linnstrument.py`)
+## NEW: Multi-Mode Ableton Remote Script System
+
+### Architecture
+
+The new multi-mode system is a complete rewrite that transforms the LinnStrument into a versatile Ableton controller with three distinct operating modes.
+
+#### Three Modes:
+
+**1. Keyboard Mode** - Original scale lighting functionality
+- Automatically displays scales based on Ableton's scale settings
+- Root and scale note coloring with track color integration
+- Real-time updates when changing scales/tracks
+- Perfect for melodic performance and composition
+
+**2. Session Mode** - Full-grid clip launcher (16×8 or 25×8)
+- Each pad launches clips
+- Real-time clip state feedback (playing/stopped/triggered/recording)
+- Clip colors displayed on grid
+- Navigate large session views
+
+**3. Drum Mode** - Integrated drum sequencer
+- Bottom 4 rows: 4×4 drum pad matrix (16 pads)
+- Top row: 16/25-step sequencer
+- Per-pad sequence editing
+- Tempo-synced playback with visual playhead
+- Real-time step programming
+
+#### Mode Switching:
+- Press hardware button (Switch 1 - CC65) to cycle modes
+- Status bar shows current mode
+- Each mode handles MIDI input differently
+- Smooth LED transitions between modes
+
+#### Modular Architecture:
+
+```python
+LinnstrumentScale (main controller)
+├── LEDManager (centralized LED control with caching)
+├── KeyboardMode (scale lighting)
+├── SessionMode (clip launcher)
+└── DrumMode (drum pads + sequencer)
+```
+
+**Key Features:**
+- Abstract base class for all modes
+- Automatic listener management
+- LED state caching to minimize MIDI traffic
+- Clean separation of concerns
+- Easy to add new modes
+
+### 1. Core Library (`scales.py`, `linnstrument.py`) [Original Standalone Tools]
 
 **Purpose**: Reusable Python modules for scale logic and MIDI control
 

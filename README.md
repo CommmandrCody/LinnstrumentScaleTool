@@ -1,336 +1,407 @@
-# Linnstrument Scale Tool
+# LinnStrument Multi-Mode System for Ableton Livecol 0 row 2 and 
+---
 
-Automatically light up your Linnstrument to show any musical scale. Works standalone or integrates with Ableton Live to automatically match the project's scale settings.
+## 🚀 Quick Start (20 minutes)
 
-## Two Ways to Use
+### 1. Install to Ableton
 
-1. **Ableton Live MIDI Remote Script** - Automatic integration with Ableton's scale settings (recommended for Ableton users)
-2. **Command Line Tool** - Simple, fast, universal - works with any DAW or standalone
+Files are already installed at:
+```
+/Users/wagner/Music/Ableton/User Library/Remote Scripts/LinnstrumentScale128/
+```
 
-## Features
+✅ **Already done!** Skip to step 2.
 
-- **Automatic Ableton Integration**: Lights update automatically when you change Ableton's scale settings
-- **Track Color Matching**: LED colors adapt based on selected track color (like Ableton Push)
-- **30+ Built-in Scales**: Major, minor, modes, pentatonics, blues, jazz, exotic scales, and more
-- **Supports Linnstrument 128 and 200**: Separate optimized scripts for each model
-- **Two-Color Display**: Root notes in one color, other scale notes in another
-- **Auto-detection**: Automatically finds your Linnstrument MIDI port (command-line tool)
-- **Configurable**: Supports custom Linnstrument tunings and layouts
+### 2. Configure LinnStrument Hardware
+yoiuve done AGAIN you broke the pads ad they play tnighgh
 
-## Installation
+You need to set up **2 presets** and **1 button** on your LinnStrument.
 
-### Option 1: Ableton Live MIDI Remote Script (Recommended for Ableton Users)
+#### Preset 1: Keyboard Mode
+1. Press **PRESET** button → switch to Preset 1
+2. Press and hold **GLOBAL SETTINGS** button (lights YELLOW)
+3. Set these (look at printed labels on your panel):
+   - **Column 1, Row 3** → MIDI MODE = "One Channel"
+   - **Column 2, Row 0** → CHANNEL = 1
+   - **Column 4, Row 3** → ROW OFFSET = 5 semitones
+   - **Column 5, Row 2-3** → OCTAVE = 5 or 6
+4. Press **GLOBAL SETTINGS** to exit (auto-saves)
 
-This provides seamless integration with Ableton Live - lights update automatically when you change the scale!
+#### Preset 2: Session/Drum Modes
+1. Press **PRESET** button → switch to Preset 2
+2. Press and hold **GLOBAL SETTINGS**
+3. Set these:
+   - **Column 1, Row 1** → MIDI MODE = "Channel Per Row" (CRITICAL!)
+   - **Column 4, Row 3** → ROW OFFSET = 5 semitones
+   - **Column 3, Row 0** → BEND RANGE = minimal (lowest setting)
+4. Press **GLOBAL SETTINGS** to exit (auto-saves)
 
-1. **Choose your Linnstrument model:**
-   - For **Linnstrument 128** (16 columns): Use `LinnstrumentScale128`
-   - For **Linnstrument 200** (26 columns): Use `LinnstrumentScale200`
+#### Switch 1: Mode Switching
+1. Press and hold **GLOBAL SETTINGS**
+2. **Column 7, Row 3** → SELECT SW = Switch 1
+3. **Column 8-9** → Find and press "CC65" (or "CC" then enter 65)
+4. Press **GLOBAL SETTINGS** to exit
 
-2. **Copy the appropriate folder to your Ableton Remote Scripts directory:**
+### 3. Find Your Base Note
 
-   **macOS:**
-   ```bash
-   cp -r ableton_remote_script/LinnstrumentScale128 ~/Music/Ableton/User\ Library/Remote\ Scripts/
+1. Press **PRESET** → Preset 1
+2. In Ableton: Create MIDI track, arm it
+3. Press **bottom-left pad** on LinnStrument
+4. Note the MIDI number (e.g., 36, 48, 60)
+5. Edit this file:
    ```
-
-   **Windows:**
+   /Users/wagner/Music/Ableton/User Library/Remote Scripts/LinnstrumentScale128/config.py
    ```
-   Copy ableton_remote_script\LinnstrumentScale128 to:
-   %USERPROFILE%\Documents\Ableton\User Library\Remote Scripts\
+6. Change line 8:
+   ```python
+   LINNSTRUMENT_BASE_NOTE = 36  # Change to YOUR number!
    ```
+7. Save and restart Ableton
 
-3. **Configure your Linnstrument:**
-   - Press bottom-left pad and note what MIDI note it plays
-   - Edit `LinnstrumentScale.py` line 99 and set `LINNSTRUMENT_BASE_NOTE` to that note number
-   - Common values: 36 (C2, Push-style), 48 (C3, factory default), 40 (E2, guitar tuning)
+### 4. Enable in Ableton
 
-4. **Enable in Ableton:**
-   - Open Ableton Live Preferences > Link/Tempo/MIDI
-   - In the MIDI Ports section, find your Linnstrument
-   - Under "Control Surface", select "LinnstrumentScale128" (or 200)
-   - Under "Input", select your Linnstrument MIDI port
-   - Under "Output", select your Linnstrument MIDI port
+1. **Ableton → Preferences → Link/Tempo/MIDI**
+2. Find your LinnStrument in MIDI Ports
+3. Set:
+   - **Control Surface:** LinnstrumentScale128
+   - **Input:** Your LinnStrument
+   - **Output:** Your LinnStrument
+4. **Quit and restart Ableton**
 
-5. **Done!** Now when you change Ableton's scale (Cmd+Shift+S or Preferences > Scales), your Linnstrument lights will update automatically!
+### 5. Test
 
-### Option 2: Command Line Tool
+1. Check Ableton's Log.txt for: `"Linnstrument Multi-Mode System - Ready!"`
+   - Location: `~/Library/Preferences/Ableton/Live X.X.X/Log.txt`
+2. Press **Switch 1** → status bar should show mode name
+3. Try each mode (see usage below)
 
-For standalone use or with other DAWs:
+---
 
-1. Make sure you have Python 3.7+ installed
-2. Install dependencies:
+## 🎹 The Three Modes
 
-```bash
-pip install -r requirements.txt
+### Mode 1: Keyboard Mode (Scale Lighting)
+
+**Hardware:** Preset 1
+**Use:** Playing melodies with scale guidance
+
+**How to use:**
+1. Press **PRESET** → Preset 1
+2. Press **Switch 1** → "Keyboard Mode"
+3. Set scale in Ableton (e.g., C Major)
+4. Scale notes light up on grid (roots = one color, scale = another)
+
+**Features:**
+- Auto-detects Ableton's scale settings
+- Track color integration
+- Real-time updates
+
+---
+
+### Mode 2: Session Mode (Clip Launcher)
+
+**Hardware:** Preset 2
+**Use:** Launching clips and scenes
+
+**How to use:**
+1. Press **PRESET** → Preset 2
+2. Press **Switch 1** → "Session Mode"
+3. Create clips in Session View
+4. Press pads to launch clips
+
+**LED Colors:**
+- **Green** = Playing
+- **Yellow** = Triggered/queued
+- **Red** = Recording
+- **Clip color** = Stopped
+- **Off** = Empty slot
+
+**Grid:** 16×8 clip matrix (columns = tracks, rows = scenes)
+
+---
+
+### Mode 3: Drum Mode (Drum Pads + Sequencer)
+
+**Hardware:** Preset 2
+**Use:** Finger drumming + beat programming
+
+**How to use:**
+1. Press **PRESET** → Preset 2
+2. Press **Switch 1** → "Drum Mode"
+3. Load Drum Rack on track
+4. **Bottom 4 rows** = drum pads (4×4 = 16 pads)
+5. **Top row** = 16-step sequencer
+6. Press drum pad to select it (turns white)
+7. Press sequencer steps to toggle them on/off (cyan = on)
+8. Press Play in Ableton → sequence plays in sync
+
+**Sequencer Features:**
+- 16 steps (16th notes)
+- Per-pad sequences (16 pads × 16 steps)
+- Tempo-synced playback
+- Visual playhead (yellow/white)
+
+**Workflow:**
+1. Press drum pad → triggers sound + selects for editing
+2. Top row shows that pad's sequence
+3. Toggle steps on/off
+4. Press different pad → see its sequence
+5. Build complete beat across all 16 pads
+
+---
+
+## ⚙️ Configuration
+
+### Base Note Setup
+
+Your base note depends on LinnStrument's octave setting. Common values:
+
+| MIDI Note | Note Name | What to set in config.py |
+|-----------|-----------|--------------------------|
+| 36 | C2 | `LINNSTRUMENT_BASE_NOTE = 36` |
+| 48 | C3 | `LINNSTRUMENT_BASE_NOTE = 48` |
+| 60 | C4 | `LINNSTRUMENT_BASE_NOTE = 60` |
+
+**Find yours:** Press bottom-left pad, check MIDI monitor, update config.py
+
+### Customization
+
+Edit `config.py` to change:
+- Base note
+- Mode switch CC number
+- Drum pad layout
+- Session grid size
+- Color schemes
+
+---
+
+## 🐛 Troubleshooting
+
+### Scale doesn't light (Keyboard Mode)
+
+**Check:**
+- Using Preset 1? (One Channel mode)
+- Global Settings button is YELLOW? (User Firmware Mode)
+- Base note matches in config.py?
+- Scale set in Ableton?
+
+**Fix:**
+- Test base note again (press bottom-left pad)
+- Update config.py with correct number
+- Restart Ableton
+
+---
+
+### Clips don't launch (Session Mode)
+
+**Check:**
+- Using Preset 2? (Channel Per Row mode)
+- Pitch Bend disabled in Preset 2?
+- Clips exist in Session View?
+
+**Fix:**
+- Verify Preset 2: MIDI MODE = "Channel Per Row"
+- Verify Preset 2: BEND RANGE = minimal
+- Create test clip to verify
+
+---
+
+### Drums don't play (Drum Mode)
+
+**Check:**
+- Using Preset 2?
+- Drum Rack loaded on selected track?
+- Track armed/monitoring?
+
+**Fix:**
+- Load factory Drum Rack preset (has samples)
+- Make sure track is selected in Ableton
+- Check track is armed
+
+---
+
+### Mode doesn't switch
+
+**Check:**
+- Switch 1 configured to CC65?
+- MIDI monitor shows CC65 when pressed?
+- Log.txt shows "Mode switch CC received"?
+
+**Fix:**
+- Reconfigure Switch 1 in Global Settings
+- Or try different CC number and update config.py:
+  ```python
+  MODE_SWITCH_CC = 65  # Change to your CC
+  ```
+
+---
+
+### Nothing works / "Not Ready" in log
+
+**Check:**
+- Files in correct location?
+  ```
+  /Users/wagner/Music/Ableton/User Library/Remote Scripts/LinnstrumentScale128/
+  ```
+- Control Surface set in Ableton preferences?
+- Ableton fully restarted after installation?
+
+**Fix:**
+- Check folder contains: `LinnstrumentScale.py`, `config.py`, `led_manager.py`, `modes/`
+- Re-select Control Surface in preferences
+- Read error messages in Log.txt
+
+---
+
+## 📁 Project Structure
+
+```
+LinnstrumentScale128/
+├── LinnstrumentScale.py       # Main controller
+├── config.py                  # Settings (EDIT THIS for base note)
+├── led_manager.py             # LED control
+├── scales.py                  # Scale definitions
+├── linnstrument_ableton.py    # MIDI interface
+└── modes/
+    ├── base_mode.py          # Base class
+    ├── keyboard_mode.py      # Scale lighting
+    ├── session_mode.py       # Clip launcher
+    └── drum_mode.py          # Drum pads + sequencer
 ```
 
-3. Make the script executable (optional):
+---
 
-```bash
-chmod +x scale_tool.py
-```
+## 💡 Tips & Tricks
 
-## Quick Start
+### Workflow Ideas
 
-### Ableton Live Integration
+**Live Performance:**
+- Load song in Session View
+- Use Session Mode to launch clips/scenes
+- Switch to Drum Mode for live beat variations
+- Switch to Keyboard Mode for solo sections
 
-Once installed, the script works automatically:
+**Production:**
+- Use Keyboard Mode to explore scales while composing
+- Session Mode for arranging clips
+- Drum Mode for programming beats
 
-1. **Change Scale**: Press Cmd+Shift+S (Mac) or Ctrl+Shift+S (Windows) to open Scale settings
-2. **Select Root & Scale**: Choose your root note and scale type
-3. **Watch Lights Update**: Your Linnstrument LEDs automatically update to show the scale!
+**Practice:**
+- Keyboard Mode shows scale patterns
+- Learn intervals and chord tones visually
+- Practice in different keys
 
-**Track Colors**: The LED colors adapt based on your selected track's color in Ableton, similar to how Push works.
+### Advanced
 
-**What You'll See**:
-- Brighter color for root notes
-- Related color for other scale notes
-- Colors change with track selection
-
-### Command Line Tool Usage
-
-Light up a C major scale:
-```bash
-python scale_tool.py C major
-```
-
-Light up D minor pentatonic:
-```bash
-python scale_tool.py D minor_pentatonic
-```
-
-Light up F# Dorian mode:
-```bash
-python scale_tool.py F# dorian
-```
-
-### Color Options
-
-Use custom colors for root and scale notes:
-```bash
-python scale_tool.py G major --root-color red --scale-color green
-```
-
-Highlight scale degrees (I, III, V) with different colors:
-```bash
-python scale_tool.py C major --degrees
-```
-
-Use custom color mapping for specific scale degrees:
-```bash
-python scale_tool.py A minor --colors '{"0": "red", "2": "yellow", "4": "green", "6": "cyan"}'
-```
-
-### Available Colors
-
-- red
-- yellow
-- green
-- cyan
-- blue
-- magenta
-- white
-- orange
-- lime
-- pink
-- off
-
-List all colors:
-```bash
-python scale_tool.py --list-colors
-```
-
-## Available Scales
-
-### Major Scales and Modes
-- `major` (Ionian)
-- `dorian`
-- `phrygian`
-- `lydian`
-- `mixolydian`
-- `aeolian` (Natural Minor)
-- `locrian`
-
-### Minor Scales
-- `minor` (Natural Minor)
-- `harmonic_minor`
-- `melodic_minor`
-
-### Pentatonic Scales
-- `major_pentatonic`
-- `minor_pentatonic`
-
-### Blues
-- `blues`
-
-### Other Common Scales
-- `whole_tone`
-- `chromatic`
-- `diminished`
-- `augmented`
-
-### Jazz/Advanced
-- `bebop_major`
-- `bebop_minor`
-- `altered` (Super Locrian)
-
-### Exotic Scales
-- `harmonic_major`
-- `double_harmonic` (Byzantine)
-- `hungarian_minor`
-- `japanese`
-- `spanish` (Phrygian Dominant)
-
-List all available scales:
-```bash
-python scale_tool.py --list-scales
-```
-
-## Advanced Usage
-
-### Custom Linnstrument Tuning
-
-If you've customized your Linnstrument tuning, you can specify the offsets:
-
-```bash
-python scale_tool.py C major --row-offset 7 --column-offset 1
-```
-
-### Specify MIDI Port
-
-If you have multiple MIDI devices, specify the port:
-
-```bash
-python scale_tool.py C major --port "Linnstrument MIDI 1"
-```
-
-List available MIDI ports:
-```bash
-python scale_tool.py --list-ports
-```
-
-### Clear All Lights
-
-Turn off all LEDs:
-```bash
-python scale_tool.py --clear
-```
-
-## Using as a Python Library
-
-You can also use the modules directly in your own Python code:
-
+**Modify layouts in config.py:**
 ```python
-from scales import get_scale_notes, note_name_to_number
-from linnstrument import Linnstrument
+# Drum mode: Make 2×8 pad layout instead of 4×4
+DRUM_PAD_ROWS = 2
+DRUM_PAD_COLUMNS = 8
 
-# Get scale notes
-root = note_name_to_number('C')
-scale_notes = get_scale_notes(root, 'major')
-
-# Connect to Linnstrument
-with Linnstrument() as linn:
-    # Light up the scale
-    linn.light_scale(scale_notes, root_color='red', scale_color='blue')
-
-    # Or use degree coloring
-    linn.light_scale_with_degrees(scale_notes)
-
-    # Or light individual notes
-    linn.light_note(60, 'green')  # Middle C
+# Session mode: Change visible area
+SESSION_ROWS = 8
+SESSION_COLUMNS = 16
 ```
 
-## How It Works
+**Add more modes:**
+- Create new file in `modes/` directory
+- Extend `BaseMode` class
+- Register in `LinnstrumentScale.py`
 
-The tool uses MIDI Control Change (CC) messages to control the Linnstrument LEDs:
+---
 
-- **CC 20**: Column coordinate (0-25)
-- **CC 21**: Row coordinate (0-7)
-- **CC 22**: Color value (0-11)
+## 🎯 Quick Reference
 
-The tool calculates which pads on the Linnstrument correspond to notes in your chosen scale, then sends MIDI messages to light them up with your specified colors.
+### Physical Buttons
 
-## Troubleshooting
+| Button | Function |
+|--------|----------|
+| **PRESET** | Cycle hardware presets (1→2→...) |
+| **GLOBAL SETTINGS** | Enter/exit settings menu |
+| **Switch 1** | Cycle software modes (Keyboard→Session→Drum→...) |
 
-### Ableton Integration Issues
+### Presets
 
-**LEDs not lighting up in Ableton:**
-1. Check that "LinnstrumentScale128" (or 200) is selected as Control Surface in Ableton MIDI preferences
-2. Make sure both Input and Output are set to your Linnstrument MIDI port
-3. Check the Ableton Log.txt file for error messages (Help > Show Log)
-4. Verify Global Settings button on Linnstrument is lit (yellow = User Firmware Mode active)
-5. Restart Ableton Live after installing the script
+| Preset | MIDI Mode | Used For |
+|--------|-----------|----------|
+| **1** | One Channel | Keyboard Mode |
+| **2** | Channel Per Row | Session + Drum Modes |
 
-**Wrong pads lighting up:**
-1. Verify you're using the correct script (LinnstrumentScale128 for 16 columns, LinnstrumentScale200 for 26 columns)
-2. Check the `LINNSTRUMENT_BASE_NOTE` setting matches your Linnstrument configuration
-   - Press bottom-left pad and note the MIDI note number
-   - Edit line 99 in `LinnstrumentScale.py` to match
-3. Verify row offset is set correctly (line 104):
-   - Most common: 5 semitones (fourths, like Push)
-   - Guitar tuning: 5 semitones
-   - Factory default: 5 semitones
+### Workflow
 
-**Global Settings button not turning yellow:**
-- The script sends NRPN 245=1 to enable User Firmware Mode
-- If it doesn't activate, try manually: Press and hold "OS Update" in Global Settings for half a second
+```
+Keyboard Mode:
+  PRESET → 1
+  Switch 1 → "Keyboard Mode"
+  Set scale in Ableton
+  Play!
 
-### Command Line Tool Issues
+Session Mode:
+  PRESET → 2
+  Switch 1 → "Session Mode"
+  Press pads → launch clips
 
-**"No Linnstrument MIDI port found":**
-1. Make sure your Linnstrument is connected via USB
-2. Check that it appears in your system's MIDI devices
-3. Run `python scale_tool.py --list-ports` to see available ports
-4. If it appears with a different name, use `--port "exact name"`
-
-**LEDs not lighting up:**
-1. Make sure your Linnstrument firmware is up to date
-2. Try clearing all lights first: `python scale_tool.py --clear`
-
-**Wrong notes are lighting up:**
-1. Check your Linnstrument tuning settings
-2. Adjust `--row-offset` and `--column-offset` to match your configuration
-3. Default is: row offset = 5 semitones, column offset = 1 semitone
-
-## Examples
-
-### Jazz Practice
-```bash
-# Dorian mode for modal jazz
-python scale_tool.py D dorian --degrees
-
-# Altered scale for dominant chords
-python scale_tool.py G altered --root-color red --scale-color cyan
+Drum Mode:
+  PRESET → 2
+  Switch 1 → "Drum Mode"
+  Bottom rows → drum pads
+  Top row → sequencer
 ```
 
-### Blues
-```bash
-# Classic blues scale
-python scale_tool.py E blues --root-color blue --scale-color cyan
+---
+
+## 📚 Documentation
+
+- **README.md** (this file) - Complete guide
+- **SETUP_CHECKLIST.md** - Step-by-step setup with checkboxes
+- **SIMPLE_PRESET_SETUP.md** - Detailed walkthrough
+- **PROJECT_SUMMARY.md** - Technical details
+- **MULTIMODE_README.md** - Extended user guide
+
+**Additional docs in `_archive_docs/`** (reference only)
+
+---
+
+## 🔧 Support
+
+**Check Ableton's Log:**
+```
+~/Library/Preferences/Ableton/Live X.X.X/Log.txt
 ```
 
-### World Music
-```bash
-# Japanese pentatonic
-python scale_tool.py A japanese --degrees
+Look for:
+- "Linnstrument Multi-Mode System - Ready!" = Success
+- ERROR messages = Something wrong (read the error)
 
-# Hungarian minor
-python scale_tool.py D hungarian_minor --degrees
-```
+**Common fixes:**
+- Wrong base note → Update config.py
+- Wrong preset → Switch to correct preset
+- Mode doesn't work → Check Log.txt for errors
 
-## License
+---
 
-MIT License - feel free to use and modify as you wish.
+## 📝 Version Info
 
-## Contributing
+**Version:** 1.0
+**Compatible with:**
+- LinnStrument 128 (16 columns)
+- LinnStrument 200 (25 columns) - edit config.py
+- Ableton Live 10+
+- macOS (tested) / Windows (should work)
 
-Found a bug or want to add a scale? Feel free to submit issues or pull requests!
+**Created:** November 2025
+**Status:** Production-ready
 
-## Credits
+---
 
-Built using:
-- [mido](https://mido.readthedocs.io/) - MIDI library for Python
-- [python-rtmidi](https://github.com/SpotlightKid/python-rtmidi) - Python bindings for RtMidi
+## 🎵 Ready to Make Music!
 
-Linnstrument is a product of Roger Linn Design.
+You now have a professional multi-mode controller for your LinnStrument.
+
+**Press Switch 1 and explore the three modes!**
+
+Questions? Check **SETUP_CHECKLIST.md** for detailed step-by-step setup.
+
+---
+
+**Enjoy!** 🎹✨

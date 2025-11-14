@@ -1,201 +1,143 @@
-# 🎹 START HERE - Linnstrument Scale Tool
+# 🎯 LinnStrument Multi-Mode System - Start Here!
 
-Welcome! This tool automatically lights up your Linnstrument to show any musical scale.
+## Which file do I need?
 
-## ⚡ Quick Start (30 seconds)
-
-```bash
-# 1. Install (one time)
-./install.sh
-
-# 2. Try it!
-./run.sh C major
-```
-
-Your Linnstrument should now light up with C major scale! 🎉
-
-**Note**: The installer creates a virtual environment (required on macOS with Homebrew Python)
-
-## 🎯 Choose Your Method
-
-### For Quick Use → **Command Line Tool** (Recommended)
-Fast and simple!
-- **Try**: `./run.sh D minor`
-- **Time**: Instant
-- **Difficulty**: Very Easy
-
-### For Ableton Live Users → **MIDI Remote Script**
-Perfect integration - just name your tracks!
-- **See**: `ableton_remote_script/README.md`
-- **Time**: 2 minutes to setup
-- **Difficulty**: Very Easy
-- **How**: Name tracks "C Major", select track, lights update!
-
-### For Any DAW (Advanced) → **MIDI Effect Plugin**
-Auto-detects scales as you play!
-- **See**: `vst_plugin/README.md`
-- **Works with**: Logic, FL Studio, Cubase, Reaper, etc.
-- **Time**: 10 minutes to setup
-- **Difficulty**: Medium (requires virtual MIDI routing)
-
-## 📚 Documentation
-
-- **`QUICK_START.md`** - Get started in 5 minutes
-- **`README.md`** - Full documentation
-- **`PROJECT_SUMMARY.md`** - Overview of everything
-- **`ARCHITECTURE.md`** - Technical details
-
-## 🎼 30+ Scales Available
-
-Major, minor, dorian, phrygian, lydian, mixolydian, pentatonics, blues, jazz scales, exotic scales, and more!
-
-```bash
-python scale_tool.py --list-scales
-```
-
-## 🎨 11 Colors Available
-
-Red, yellow, green, cyan, blue, magenta, white, orange, lime, pink, off
-
-```bash
-python scale_tool.py C major --root-color red --scale-color blue
-```
-
-## 💡 Examples
-
-```bash
-# If you used install.sh, use ./run.sh:
-./run.sh C major
-./run.sh A minor
-./run.sh D dorian --degrees
-
-# Or activate venv manually and use python:
-source venv/bin/activate
-
-# Basic scales
-python scale_tool.py C major
-python scale_tool.py A minor
-python scale_tool.py D dorian
-
-# Pentatonics
-python scale_tool.py E minor_pentatonic
-python scale_tool.py G major_pentatonic
-
-# Jazz
-python scale_tool.py D dorian --degrees
-python scale_tool.py G altered
-
-# Blues
-python scale_tool.py E blues
-
-# Exotic
-python scale_tool.py A japanese
-python scale_tool.py D hungarian_minor
-
-# Custom colors
-python scale_tool.py F# lydian --root-color magenta --scale-color cyan
-
-# Clear lights
-python scale_tool.py --clear
-```
-
-## 🎮 Interactive Demo
-
-```bash
-python examples.py
-```
-
-This will walk you through various examples interactively!
-
-## 🔧 Troubleshooting
-
-### Linnstrument not found?
-```bash
-# Check your ports:
-python scale_tool.py --list-ports
-
-# Make sure Linnstrument is connected via USB
-```
-
-### Dependencies not installed?
-```bash
-pip install -r requirements.txt
-```
-
-### Need help?
-```bash
-python scale_tool.py --help
-```
-
-## 🎯 Common Workflows
-
-### Practice Session
-```bash
-# Show the scale you're practicing
-python scale_tool.py G major --degrees
-
-# The I, III, and V will be different colors
-```
-
-### Composition
-```bash
-# Try different scales quickly
-python scale_tool.py C ionian
-python scale_tool.py C dorian
-python scale_tool.py C phrygian
-# ... cycle through modes
-```
-
-### Live Performance (with Ableton)
-1. Open Ableton Live
-2. Add the Max for Live device to a MIDI track
-3. Select your scale
-4. Click "Update Lights"
-5. Play!
-
-## 📖 What Each File Does
-
-| File | Purpose |
-|------|---------|
-| `scale_tool.py` | Command-line interface (easiest to start) |
-| `scales.py` | All scale definitions |
-| `linnstrument.py` | Controls the LED lights |
-| `examples.py` | Interactive demonstrations |
-| `setup.py` | Guided installation |
-| `max_for_live/` | Ableton Live integration |
-| `vst_plugin/` | MIDI effect with auto-detect |
-
-## 🚀 Next Steps
-
-1. **Try the command line tool** - Start with `python scale_tool.py C major`
-2. **Explore scales** - Try different modes and scales
-3. **Try degree coloring** - Add `--degrees` to highlight chord tones
-4. **Run examples** - `python examples.py` for guided tour
-5. **If using Ableton** - Install the Max for Live device
-6. **Advanced users** - Try the MIDI effect plugin with auto-detection
-
-## 💬 Questions?
-
-Check these docs:
-- **QUICK_START.md** - Quick reference
-- **README.md** - Complete guide
-- **max_for_live/README.md** - Ableton setup
-- **vst_plugin/README.md** - MIDI effect setup
-
-## 🎵 Tips
-
-- Use **degree coloring** (`--degrees`) to learn scale shapes
-- Try **exotic scales** for inspiration (japanese, spanish, hungarian_minor)
-- Match scales to **Ableton's scale highlighting** for consistency
-- Use **blues scale** for jam sessions
-- Try **altered scale** for jazz dominant chords
+Choose based on what you want to do:
 
 ---
 
-**Ready? Let's light it up! 🎹✨**
+### 📋 **SETUP_CHECKLIST.md** ⭐ RECOMMENDED
 
-```bash
-python scale_tool.py C major
-```
+**Use if:** You want step-by-step instructions with checkboxes
 
-Enjoy your illuminated Linnstrument!
+**What's inside:**
+- ☐ Step 1: Configure Preset 1
+- ☐ Step 2: Configure Preset 2
+- ☐ Step 3: Configure Switch 1
+- ☐ Step 4: Find base note
+- ☐ Step 5: Enable in Ableton
+- ☐ Step 6: Test everything
+
+**Time:** 20 minutes
+**Best for:** First-time setup
+
+---
+
+### 📖 **README.md**
+
+**Use if:** You want the complete overview
+
+**What's inside:**
+- Quick Start (condensed)
+- How to use each mode
+- Troubleshooting
+- Configuration
+- Tips & tricks
+
+**Best for:** Understanding the whole system
+
+---
+
+### 📝 **SIMPLE_PRESET_SETUP.md**
+
+**Use if:** You want detailed walkthrough using physical buttons only
+
+**What's inside:**
+- Detailed instructions for each step
+- Uses only PRESET and GLOBAL SETTINGS buttons
+- No confusing grid navigation
+- Full explanations
+
+**Best for:** If checklist isn't detailed enough
+
+---
+
+### 📚 **MULTIMODE_README.md**
+
+**Use if:** You want extended user guide with workflows
+
+**What's inside:**
+- Deep dive into each mode
+- Workflow examples
+- Advanced features
+- Future enhancements
+- Complete documentation
+
+**Best for:** After you've got it working and want to learn more
+
+---
+
+### 🔧 **PROJECT_SUMMARY.md**
+
+**Use if:** You want technical architecture details
+
+**What's inside:**
+- System architecture
+- Code structure
+- Implementation notes
+- Developer information
+
+**Best for:** Understanding how it works / modifying code
+
+---
+
+## 🚀 Recommended Path
+
+### New User:
+1. Read **SETUP_CHECKLIST.md** (follow step-by-step)
+2. If stuck, check **SIMPLE_PRESET_SETUP.md** for details
+3. Once working, read **README.md** for full overview
+
+### Experienced User:
+1. Skim **README.md** (get the overview)
+2. Configure hardware using your knowledge
+3. Refer to **README.md** troubleshooting if needed
+
+### Developer:
+1. Read **PROJECT_SUMMARY.md** (architecture)
+2. Browse the code in `modes/` directory
+3. Modify `config.py` for customization
+
+---
+
+## ❓ Quick Answers
+
+**Q: How do I install it?**
+A: Already installed! Files are at:
+`/Users/wagner/Music/Ableton/User Library/Remote Scripts/LinnstrumentScale128/`
+
+**Q: What do I need to configure?**
+A: 2 presets on LinnStrument + 1 button + base note in config.py
+
+**Q: Which file to start with?**
+A: **SETUP_CHECKLIST.md** - it's a step-by-step guide with checkboxes
+
+**Q: It's not working!**
+A: Check **README.md** → Troubleshooting section
+
+**Q: How do I use the three modes?**
+A: Read **README.md** → "The Three Modes" section
+
+---
+
+## 📂 Archived Files
+
+Old documentation moved to `_archive_docs/`:
+- HARDWARE_SETUP.md
+- IMPLEMENTATION_COMPLETE.md
+- PRESET_SETUP_STEP_BY_STEP.md
+- And others...
+
+**You don't need these!** The 5 main files have everything.
+
+---
+
+## 🎵 Get Started Now!
+
+**Open: SETUP_CHECKLIST.md**
+
+Follow the checkboxes. Takes 20 minutes. You'll be making music!
+
+---
+
+**Good luck!** 🎹✨
