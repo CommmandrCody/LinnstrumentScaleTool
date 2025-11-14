@@ -307,10 +307,6 @@ class LinnstrumentScale(ControlSurface):
                 Live.MidiMap.forward_midi_cc(script_handle, midi_map_handle,
                                             MODE_SWITCH_CHANNEL, MODE_SWITCH_CC)
                 self.log_message(f"Forwarding CC{MODE_SWITCH_CC} (mode switch) to receive_midi")
-
-            # In keyboard mode, we can optionally forward notes for translation
-            # For now, let all notes pass through
-            else:
                 self.log_message("All notes pass through to track")
 
         except Exception as e:

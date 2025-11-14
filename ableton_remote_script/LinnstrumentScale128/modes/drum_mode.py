@@ -469,8 +469,11 @@ class DrumMode(BaseMode):
             True if handled, False to pass through
         """
         try:
+            self.log_message(f"DrumMode.handle_cc: CC{cc_number}={value}")
+
             # Switch 1 (CC65) - Bank LEFT
             if cc_number == 65 and value > 0:
+                self.log_message("Switch 1 detected - switching bank LEFT")
                 if self._pad_bank_offset > 0:
                     self._pad_bank_offset -= 16
                     self.show_message(f"Drum Bank {self._pad_bank_offset // 16}")
