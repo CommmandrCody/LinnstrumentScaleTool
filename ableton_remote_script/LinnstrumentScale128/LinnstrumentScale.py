@@ -79,10 +79,8 @@ class LinnstrumentScale(ControlSurface):
         self.current_root = None
         self.current_track_color = None
 
-        # Track selection row feature (DISABLED - conflicts with isomorphic layout)
-        # The same notes appear on multiple rows, making it impossible to detect
-        # which physical pad was pressed. Use Push for track selection instead.
-        self.track_row_enabled = False  # Set to True to enable (experimental)
+        # Track selection row feature
+        self.track_row_enabled = True  # Toggle this to enable/disable track selection row
 
         # Note history for auto-detection
         self.note_history = []
@@ -411,24 +409,8 @@ class LinnstrumentScale(ControlSurface):
             self.log_message(f"Error lighting scale: {e}")
 
     def build_midi_map(self, midi_map_handle):
-        """Build MIDI map to receive MIDI from top row"""
-        if not self.linnstrument or not self.track_row_enabled:
-            return
-
-        # Import MIDI map functions
-        import Live
-
-        # Calculate top row note range
-        base_note = self.linnstrument.base_note
-        row_offset = self.linnstrument.row_offset
-        top_row_start = base_note + (7 * row_offset)
-        top_row_end = top_row_start + 16  # 16 columns
-
-        # Forward all top row notes to receive_midi
-        script_handle = self._c_instance.handle()
-        for note in range(top_row_start, top_row_end):
-            Live.MidiMap.forward_midi_note(script_handle, midi_map_handle, 0, note)
-            self.log_message(f"Forwarding MIDI note {note} to receive_midi")
+        """Build MIDI map (required by API but not used)"""
+        pass
 
     def update_display(self):
         """Update display (required by API but not used)"""
@@ -442,12 +424,10 @@ class LinnstrumentScale(ControlSurface):
             note = midi_bytes[1]
             velocity = midi_bytes[2]
 
-
             # Check if it's a note-on message (status 144-159)
             if 144 <= status <= 159 and velocity > 0:
                 # Check if this note is from the top row (row 7)
                 if self.track_row_enabled and self._is_top_row_note(note):
-                    self.log_message(f"Top row note detected: {note}")
                     self._handle_track_selection(note)
                     return  # Don't pass through to note history
 
@@ -468,50 +448,35 @@ class LinnstrumentScale(ControlSurface):
         if not self.linnstrument:
             return False
 
-        # Get the actual position of this note
-        positions = self.linnstrument.get_position_for_note(note)
+        # Calculate which row this note is on
+        base_note = self.linnstrument.base_note
+        row_offset = self.linnstrument.row_offset
 
-        # Check if ANY of the positions for this note are on row 7
-        for column, row in positions:
-            if row == 7:  # Top row
-                return True
+        # Top row notes are base_note + (row 7 * row_offset) + column_offset
+        # For base_note=36, row_offset=5: row 7 starts at note 71 (36 + 35)
+        top_row_start = base_note + (7 * row_offset)
+        top_row_end = top_row_start + 16  # 16 columns
 
-        return False
+        return top_row_start <= note < top_row_end
 
     def _handle_track_selection(self, note):
         """Select track based on which pad in the top row was pressed"""
         try:
-            # Get the position(s) of this note
-            positions = self.linnstrument.get_position_for_note(note)
+            # Calculate which column was pressed
+            base_note = self.linnstrument.base_note
+            row_offset = self.linnstrument.row_offset
+            top_row_start = base_note + (7 * row_offset)
 
-            # Find the position that's on row 7
-            column = None
-            for col, row in positions:
-                if row == 7:
-                    column = col
-                    break
-
-            if column is None:
-                self.log_message(f"Note {note} is not on top row")
-                return
-
-            self.log_message(f"Track selection: note={note}, column={column}")
+            column = note - top_row_start  # 0-15 for Linnstrument 128
 
             # Get tracks
             tracks = list(self.song().tracks)
-            self.log_message(f"Total tracks: {len(tracks)}")
 
             # Select the track if it exists
             if 0 <= column < len(tracks):
-                track = tracks[column]
-                self.log_message(f"Attempting to select track {column + 1}: {track.name}")
-                self.song().view.selected_track = track
-                self.log_message(f"Successfully selected track {column + 1}: {track.name}")
+                self.song().view.selected_track = tracks[column]
+                self.log_message(f"Selected track {column + 1}: {tracks[column].name}")
                 # Scale will update automatically via _on_track_changed listener
-            else:
-                self.log_message(f"Column {column} out of range (0-{len(tracks)-1})")
 
         except Exception as e:
             self.log_message(f"Error selecting track: {e}")
-            import traceback
-            self.log_message(f"Traceback: {traceback.format_exc()}")
