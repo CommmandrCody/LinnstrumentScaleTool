@@ -301,38 +301,17 @@ class LinnstrumentScale(ControlSurface):
                                         MODE_SWITCH_CHANNEL, MODE_SWITCH_CC)
             self.log_message(f"Forwarding CC{MODE_SWITCH_CC} (mode switch) to receive_midi")
 
-            # In drum mode, forward drum pads AND sequencer rows
+            # In drum mode, forward ONLY bank buttons (row 4, columns 0-1)
             if self._current_mode_index == MODE_DRUM:
                 base_note = self.linnstrument.base_note
-                column_offset = self.linnstrument.column_offset
-
-                # Forward drum pad rows (0-3, first 4 columns only) for pad selection
-                # Row offset is now 4 (chromatic) thanks to NRPN
-                drum_pad_notes = []
-                for row in range(0, 4):
-                    row_start = base_note + (row * 4)  # row_offset=4 (chromatic)
-                    # Only forward first 4 columns (4x4 grid like Push)
-                    for col in range(4):
-                        note = row_start + col
-                        Live.MidiMap.forward_midi_note(script_handle, midi_map_handle, 0, note)
-                        drum_pad_notes.append(note)
-
-                # Forward sequencer rows (4-7) for step programming
-                sequencer_notes = []
-                for row in range(4, 8):
-                    row_start = base_note + (row * 4)  # row_offset=4 (chromatic)
-                    row_end = row_start + (16 * column_offset)
-                    for note in range(row_start, row_end):
-                        Live.MidiMap.forward_midi_note(script_handle, midi_map_handle, 0, note)
-                        sequencer_notes.append(note)
-
-                self.log_message(f"Drum mode: Forwarding drum pads {min(drum_pad_notes)}-{max(drum_pad_notes)}")
-                self.log_message(f"Drum mode: Forwarding sequencer notes {min(sequencer_notes)}-{max(sequencer_notes)}")
-                self.log_message(f"  Drum Pads (4x4): {min(drum_pad_notes)}-{max(drum_pad_notes)}")
-                self.log_message(f"  Sequencer Row 4: {base_note + (4 * 4)}-{base_note + (4 * 4) + 15}")
-                self.log_message(f"  Sequencer Row 5: {base_note + (5 * 4)}-{base_note + (5 * 4) + 15}")
-                self.log_message(f"  Sequencer Row 6: {base_note + (6 * 4)}-{base_note + (6 * 4) + 15}")
-                self.log_message(f"  Sequencer Row 7: {base_note + (7 * 4)}-{base_note + (7 * 4) + 15}")
+                # Bank buttons at row 4 (first sequencer row), columns 0-1
+                # Row 4 with row_offset=4: base + (4 * 4) + col
+                bank_left = base_note + 16  # Row 4, column 0
+                bank_right = base_note + 17  # Row 4, column 1
+                Live.MidiMap.forward_midi_note(script_handle, midi_map_handle, 0, bank_left)
+                Live.MidiMap.forward_midi_note(script_handle, midi_map_handle, 0, bank_right)
+                self.log_message(f"Drum mode: Forwarding bank buttons {bank_left}, {bank_right} (row 4, cols 0-1)")
+                self.log_message("Drum pads (rows 0-3, cols 0-3) pass through to track")
 
             # In keyboard mode, we can optionally forward notes for translation
             # For now, let all notes pass through
