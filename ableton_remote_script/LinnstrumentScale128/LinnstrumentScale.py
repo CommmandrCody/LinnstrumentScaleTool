@@ -296,22 +296,17 @@ class LinnstrumentScale(ControlSurface):
 
             script_handle = self._c_instance.handle()
 
-            # Forward mode switch CC
-            Live.MidiMap.forward_midi_cc(script_handle, midi_map_handle,
-                                        MODE_SWITCH_CHANNEL, MODE_SWITCH_CC)
-            self.log_message(f"Forwarding CC{MODE_SWITCH_CC} (mode switch) to receive_midi")
-
-            # In drum mode, forward ONLY bank buttons (row 4, columns 0-1)
+            # In drum mode, forward BOTH switches for bank switching (left/right)
             if self._current_mode_index == MODE_DRUM:
-                base_note = self.linnstrument.base_note
-                # Bank buttons at row 4 (first sequencer row), columns 0-1
-                # Row 4 with row_offset=4: base + (4 * 4) + col
-                bank_left = base_note + 16  # Row 4, column 0
-                bank_right = base_note + 17  # Row 4, column 1
-                Live.MidiMap.forward_midi_note(script_handle, midi_map_handle, 0, bank_left)
-                Live.MidiMap.forward_midi_note(script_handle, midi_map_handle, 0, bank_right)
-                self.log_message(f"Drum mode: Forwarding bank buttons {bank_left}, {bank_right} (row 4, cols 0-1)")
+                Live.MidiMap.forward_midi_cc(script_handle, midi_map_handle, MODE_SWITCH_CHANNEL, 65)  # Switch 1 - Bank LEFT
+                Live.MidiMap.forward_midi_cc(script_handle, midi_map_handle, MODE_SWITCH_CHANNEL, 66)  # Switch 2 - Bank RIGHT
+                self.log_message("Drum mode: Forwarding Switch 1 (CC65) and Switch 2 (CC66) for bank navigation")
                 self.log_message("Drum pads (rows 0-3, cols 0-3) pass through to track")
+            else:
+                # In other modes, forward CC65 for manual mode switching if needed
+                Live.MidiMap.forward_midi_cc(script_handle, midi_map_handle,
+                                            MODE_SWITCH_CHANNEL, MODE_SWITCH_CC)
+                self.log_message(f"Forwarding CC{MODE_SWITCH_CC} (mode switch) to receive_midi")
 
             # In keyboard mode, we can optionally forward notes for translation
             # For now, let all notes pass through
@@ -344,17 +339,18 @@ class LinnstrumentScale(ControlSurface):
                 cc_number = data1
                 value = data2
 
+                # Pass CC to active mode FIRST (so drum mode can handle bank switching)
+                if self._active_mode and hasattr(self._active_mode, 'handle_cc'):
+                    if self._active_mode.handle_cc(cc_number, value):
+                        return  # Mode handled it
+
+                # If mode didn't handle it, check for mode switch CC
                 if channel == MODE_SWITCH_CHANNEL and cc_number == MODE_SWITCH_CC:
                     # Mode switch button pressed (only trigger on value > 0)
                     if value > 0:
                         self.log_message(f"Mode switch CC received (CC{cc_number}={value})")
                         self._cycle_mode()
                     return
-
-                # Pass CC to active mode
-                if self._active_mode and hasattr(self._active_mode, 'handle_cc'):
-                    if self._active_mode.handle_cc(cc_number, value):
-                        return  # Mode handled it
 
             # Check for note on/off
             elif 0x80 <= status <= 0x9F:  # Note On or Note Off

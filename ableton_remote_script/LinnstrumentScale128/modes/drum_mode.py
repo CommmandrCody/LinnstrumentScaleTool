@@ -340,15 +340,6 @@ class DrumMode(BaseMode):
                     color = self._get_drum_pad_color(pad_index)
                     self.led_manager.set_led(col, row, color)
 
-            # Light up bank buttons (row 4, columns 0-1)
-            # Left button - dim if at first bank, bright otherwise
-            left_color = 'blue' if self._pad_bank_offset > 0 else 'cyan'
-            self.led_manager.set_led(0, 4, left_color)
-
-            # Right button - dim if at last bank, bright otherwise
-            right_color = 'blue' if self._pad_bank_offset + 16 < 64 else 'cyan'
-            self.led_manager.set_led(1, 4, right_color)
-
             # Turn off other columns in drum pad rows
             for row in range(DRUM_PAD_ROWS):
                 for col in range(4, 16):
@@ -466,6 +457,44 @@ class DrumMode(BaseMode):
             color_new = self._get_sequencer_step_color(new_step, sequence[new_step], pad_index)
             self.led_manager.set_led(new_step, linnstrument_row, color_new)
 
+    def handle_cc(self, cc_number, value):
+        """
+        Handle CC messages for bank switching
+
+        Args:
+            cc_number: CC number
+            value: CC value
+
+        Returns:
+            True if handled, False to pass through
+        """
+        try:
+            # Switch 1 (CC65) - Bank LEFT
+            if cc_number == 65 and value > 0:
+                if self._pad_bank_offset > 0:
+                    self._pad_bank_offset -= 16
+                    self.show_message(f"Drum Bank {self._pad_bank_offset // 16}")
+                    self.log_message(f"Switch 1: Bank LEFT to offset {self._pad_bank_offset}")
+                    self._update_drum_pad_leds()
+                else:
+                    self.show_message("Drum Bank 0 (first)")
+                return True
+
+            # Switch 2 (CC66) - Bank RIGHT
+            if cc_number == 66 and value > 0:
+                if self._pad_bank_offset + 16 < 64:
+                    self._pad_bank_offset += 16
+                    self.show_message(f"Drum Bank {self._pad_bank_offset // 16}")
+                    self.log_message(f"Switch 2: Bank RIGHT to offset {self._pad_bank_offset}")
+                    self._update_drum_pad_leds()
+                else:
+                    self.show_message("Drum Bank 3 (last)")
+                return True
+        except Exception as e:
+            self.log_message(f"Error in handle_cc: {e}")
+
+        return False  # Pass through
+
     def handle_note(self, note, velocity, is_note_on):
         """
         Handle drum pad and sequencer input - just update LEDs, let notes pass through
@@ -505,30 +534,6 @@ class DrumMode(BaseMode):
 
             column, row = positions_sorted[0]
             self.log_message(f"  SELECTED: row={row} col={column}")
-
-            # Check for bank buttons (row 4, columns 0-1)
-            if row == 4 and column <= 1:
-                self.log_message(f"  >>> BANK BUTTON DETECTED <<<")
-                if is_note_on:
-                    if column == 0:
-                        # Left bank button
-                        if self._pad_bank_offset > 0:
-                            self._pad_bank_offset -= 16
-                            self.show_message(f"Drum Bank {self._pad_bank_offset // 16}")
-                            self.log_message(f"Bank left: offset now {self._pad_bank_offset}")
-                            self._update_drum_pad_leds()
-                        else:
-                            self.show_message("Drum Bank 0 (first)")
-                    elif column == 1:
-                        # Right bank button
-                        if self._pad_bank_offset + 16 < 64:
-                            self._pad_bank_offset += 16
-                            self.show_message(f"Drum Bank {self._pad_bank_offset // 16}")
-                            self.log_message(f"Bank right: offset now {self._pad_bank_offset}")
-                            self._update_drum_pad_leds()
-                        else:
-                            self.show_message("Drum Bank 3 (last)")
-                return True  # Intercept bank buttons
 
             # Check if in drum pad area (bottom 4 rows, ONLY 4 columns like Push)
             if row < DRUM_PAD_ROWS and column < DRUM_PAD_COLUMNS:
