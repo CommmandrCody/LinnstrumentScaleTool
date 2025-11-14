@@ -150,13 +150,7 @@ class DrumMode(BaseMode):
             self._add_listener(self.song, 'add_is_playing_listener', self._on_playback_changed)
             self._add_listener(self.song, 'add_current_song_time_listener', self._on_song_time_changed)
 
-            # Add note listener to track for pad selection
-            try:
-                track = self.song.view.selected_track
-                if hasattr(track, 'add_playing_notes_listener'):
-                    self._add_listener(track, 'add_playing_notes_listener', self._on_note_played)
-            except:
-                pass
+            # DON'T add playing_notes_listener - it causes note repeating
 
             # Force clear all LEDs with cache bypass
             self.log_message("Force clearing all LEDs...")
