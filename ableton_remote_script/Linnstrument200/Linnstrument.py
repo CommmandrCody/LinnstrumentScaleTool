@@ -56,7 +56,7 @@ ABLETON_SCALE_MAP = {
 }
 
 
-class LinnstrumentScale(ControlSurface):
+class Linnstrument(ControlSurface):
     """
     MIDI Remote Script that monitors Ableton's scale settings
     and updates Linnstrument lights accordingly

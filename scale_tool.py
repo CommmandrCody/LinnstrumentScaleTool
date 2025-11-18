@@ -9,5 +9,4 @@ import sys
 
 from scales import get_scale_notes, get_available_scales, note_name_to_number, NOTE_NAMES
 from linnstrument import Linnstrument
-
-def main():N
+I dont' know whythwe lowe

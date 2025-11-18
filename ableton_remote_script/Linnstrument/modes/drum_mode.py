@@ -150,7 +150,13 @@ class DrumMode(BaseMode):
             self._add_listener(self.song, 'add_is_playing_listener', self._on_playback_changed)
             self._add_listener(self.song, 'add_current_song_time_listener', self._on_song_time_changed)
 
-            # DON'T add playing_notes_listener - it causes note repeating
+            # Add note listener to track for pad selection
+            try:
+                track = self.song.view.selected_track
+                if hasattr(track, 'add_playing_notes_listener'):
+                    self._add_listener(track, 'add_playing_notes_listener', self._on_note_played)
+            except:
+                pass
 
             # Force clear all LEDs with cache bypass
             self.log_message("Force clearing all LEDs...")
@@ -195,8 +201,26 @@ class DrumMode(BaseMode):
 
     def _on_note_played(self):
         """Note played on track - update pad selection"""
-        # DISABLED - this listener fires continuously and causes note repeating
-        pass
+        try:
+            track = self.song.view.selected_track
+            if hasattr(track, 'playing_notes'):
+                notes = track.playing_notes
+                if notes and len(notes) > 0:
+                    # Get most recent note
+                    note = notes[-1][0] if isinstance(notes[-1], tuple) else notes[-1]
+
+                    # Convert note to pad index (note 36 = pad 0, note 51 = pad 15)
+                    if note >= 36 and note <= 51:
+                        pad_index = note - 36
+                        if pad_index < 16:  # Only first 16 pads (4x4)
+                            old_selected = self._selected_pad
+                            self._selected_pad = pad_index
+                            self.log_message(f"Note listener: selected pad {pad_index} from note {note}")
+                            if old_selected != self._selected_pad:
+                                self._update_drum_pad_leds()
+                                self._update_sequencer_leds()
+        except Exception as e:
+            self.log_message(f"Error in note listener: {e}")
 
     def _on_track_changed(self):
         """Track changed - find new drum rack"""
@@ -304,6 +328,7 @@ class DrumMode(BaseMode):
         # Simple 4x4 grid showing pads 0-15 (notes 36-51)
         # Just like Push - no extended columns, just 4x4
 
+        self.log_message("=== UPDATING DRUM PAD LEDS ===")
         for row in range(DRUM_PAD_ROWS):
             for col in range(DRUM_PAD_COLUMNS):  # Only 4 columns like Push
                 # Simple mapping: pad_index = row * 4 + col
@@ -311,6 +336,7 @@ class DrumMode(BaseMode):
 
                 # Get color based on whether this pad has a sample
                 color = self._get_drum_pad_color(pad_index)
+                self.log_message(f"  Row {row}, Col {col}: pad={pad_index}, color={color}")
                 self.led_manager.set_led(col, row, color)
 
         # Turn off columns 4-15 (we only use 4x4 like Push)
@@ -345,7 +371,9 @@ class DrumMode(BaseMode):
                     drum_pad = drum_pads[drum_rack_note]
 
                     # Check if pad has a sample
-                    if hasattr(drum_pad, 'chains') and len(drum_pad.chains) > 0:
+                    has_chains = hasattr(drum_pad, 'chains') and len(drum_pad.chains) > 0
+                    self.log_message(f"    Pad {pad_index} (note {drum_rack_note}): has_chains={has_chains}")
+                    if has_chains:
                         # Has sample - show as green (will add track color later)
                         return 'green'
 
@@ -443,16 +471,35 @@ class DrumMode(BaseMode):
             # With chromatic layout (row_offset=4), notes can appear at multiple positions
             # e.g., note 40 at both (col=4, row=0) and (col=0, row=1)
             # Prefer the position with the lowest row (actual pad location)
+            if len(positions) > 1:
+                self.log_message(f"Note {note} found at multiple positions: {positions}")
             positions_sorted = sorted(positions, key=lambda p: (p[1], p[0]))  # Sort by row, then column
             column, row = positions_sorted[0]
+            if len(positions) > 1:
+                self.log_message(f"Selected position (row={row}, col={column}) from {len(positions)} options")
 
             # Check if in drum pad area (bottom 4 rows, ONLY 4 columns like Push)
             if row < DRUM_PAD_ROWS and column < DRUM_PAD_COLUMNS:
-                # Let note pass through to track naturally - NO LED UPDATES HERE
-                return False
+                if is_note_on:
+                    # Select this pad when pressed
+                    pad_index = row * 4 + column
+                    if pad_index != self._selected_pad:
+                        self._selected_pad = pad_index
+                        self.log_message(f"Selected drum pad {pad_index} (row={row}, col={column})")
+                        # Update sequencer to show this pad's sequence
+                        self._update_sequencer_leds()
+                        # Update drum pad LEDs to show selection
+                        self._update_drum_pad_leds()
+
+                # Re-send the note to the track so it plays
+                # (forwarded notes are intercepted, so we must re-send them)
+                status = 0x90 if is_note_on else 0x80  # Note on/off, channel 1
+                self.linnstrument.send_midi([status, note, velocity])
+                return True  # We handled it (by re-sending)
 
             # Check if in sequencer area (rows 4-7)
             elif row >= DRUM_PAD_ROWS:
+                self.log_message(f"Sequencer press: col={column}, row={row}")
                 if is_note_on:
                     self._handle_sequencer_press(column, row)
                 return True  # Intercept sequencer presses
