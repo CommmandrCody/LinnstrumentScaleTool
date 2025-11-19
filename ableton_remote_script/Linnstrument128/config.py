@@ -1,9 +1,11 @@
 """
 Configuration constants for LinnStrument multi-mode system
+Works with both LinnStrument 128 and LinnStrument 200
 """
 
 # LinnStrument Hardware Configuration
-LINNSTRUMENT_COLUMNS = 16  # LinnStrument 128
+# Set to your device: 16 for LinnStrument 128, 25 for LinnStrument 200
+LINNSTRUMENT_COLUMNS = 16  # Change to 25 for LinnStrument 200
 LINNSTRUMENT_ROWS = 8
 LINNSTRUMENT_BASE_NOTE = 36  # C2 - IMPORTANT: Adjust your LinnStrument's octave setting to match!
 LINNSTRUMENT_ROW_OFFSET = 5  # Semitones per row
@@ -31,13 +33,13 @@ MODE_COLORS = {
 # Drum Mode Configuration
 DRUM_PAD_ROWS = 4  # Bottom 4 rows (0-3) for drum pads
 DRUM_PAD_COLUMNS = 4  # 4x4 grid on left side (like Push)
-DRUM_PAD_EXTENDED_COLUMNS = 16  # Can extend to show more pads to the right
+DRUM_PAD_EXTENDED_COLUMNS = LINNSTRUMENT_COLUMNS  # Can extend to show more pads
 SEQUENCER_ROWS = 4  # Top 4 rows (4-7) for sequencer
-SEQUENCER_STEPS = 16  # 16 steps for LinnStrument 128 (full width)
+SEQUENCER_STEPS = LINNSTRUMENT_COLUMNS  # Full width of device
 
 # Session Mode Configuration
 SESSION_ROWS = 8  # Full grid height
-SESSION_COLUMNS = 16  # Full grid width (LinnStrument 128)
+SESSION_COLUMNS = LINNSTRUMENT_COLUMNS  # Full grid width
 SESSION_SCENE_LAUNCH_COLUMN = None  # Optional: column for scene launch
 
 # Keyboard Mode Configuration

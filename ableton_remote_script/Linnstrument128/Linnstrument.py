@@ -1,5 +1,5 @@
 """
-LinnStrument Multi-Mode System
+LinnStrument 128 Multi-Mode System
 - Keyboard Mode: Scale lighting (row offset 5)
 - Drum Mode: 4x4 drum grid + 16-step sequencer (Push-style)
 - Auto-switches to drum mode when drum rack detected
@@ -87,6 +87,11 @@ class Linnstrument(ControlSurface):
         self.song().add_root_note_listener(self._on_scale_changed)
         self.song().add_scale_name_listener(self._on_scale_changed)
         self.song().view.add_selected_track_listener(self._on_track_changed)
+        self.log_message("Track change listener registered successfully")
+
+        # DON'T enable User Firmware Mode - it changes note behavior!
+        # LED control (CC 20/21/22) works without User Firmware Mode
+        self.log_message("Using standard MIDI mode (User Firmware Mode disabled)")
 
         # Initial mode
         self._auto_switch_mode()
@@ -97,7 +102,7 @@ class Linnstrument(ControlSurface):
         """Clean disconnect"""
         self.log_message("Multi-Mode System disconnecting...")
 
-        # Restore row offset to 5 (fifths) before disconnecting
+        # Restore row offset to 5 (fifths)
         self._send_nrpn(227, 5)
         self.log_message("Restored row offset to 5 (fifths)")
 
@@ -133,11 +138,13 @@ class Linnstrument(ControlSurface):
 
     def _on_track_changed(self):
         """Track changed - check if we should switch modes"""
+        self.log_message("=== TRACK CHANGED - checking mode ===")
         self._auto_switch_mode()
 
     def _auto_switch_mode(self):
         """Auto-switch to drum mode if drum rack detected"""
         track = self.song().view.selected_track
+        self.log_message(f"Auto-switch mode check: track={track.name}, current_mode={self._mode}")
 
         # Check for drum rack
         has_drum_rack = False
@@ -148,27 +155,30 @@ class Linnstrument(ControlSurface):
                     self._drum_rack = device
                     break
 
+        self.log_message(f"Has drum rack: {has_drum_rack}")
+
         # Switch mode
         if has_drum_rack and self._mode != 'drum':
             self.log_message("Drum rack detected - switching to Drum Mode")
             self._mode = 'drum'
-            # Set row offset to 4 (chromatic) for drum mode
+            # Set row offset to 4 (major third = 4 semitones) for drum mode
+            # This gives us a chromatic 4x4 grid
             self._send_nrpn(227, 4)
             self.linnstrument.row_offset = 4
-            # Set base note to 24 (C1) for drum mode
-            self.linnstrument.base_note = 24
-            self.log_message("Set row offset to 4 (chromatic), base note to 24 (C1)")
+            # DON'T change base_note or transpose - just light the correct pads
+            # The hardware will send whatever notes it's configured to send
+            self.log_message("Set row offset to 4 (chromatic grid)")
             self._update_drum_leds()
             self.show_message("Linnstrument: Drum Mode")
         elif not has_drum_rack and self._mode != 'keyboard':
             self.log_message("No drum rack - switching to Keyboard Mode")
             self._mode = 'keyboard'
             self._drum_rack = None
-            # Restore row offset to 5 (fifths) and base note to 36 (C2) for keyboard mode
+            # Restore row offset to 5 (fifths) for keyboard mode
             self._send_nrpn(227, 5)
             self.linnstrument.row_offset = 5
-            self.linnstrument.base_note = LINNSTRUMENT_BASE_NOTE  # Restore to 36
-            self.log_message("Restored row offset to 5 (fifths), base note to 36 (C2)")
+            # DON'T change base_note - it's already correct from initialization
+            self.log_message("Restored row offset to 5 (fifths)")
             self._update_keyboard_leds()
             self.show_message("Linnstrument: Keyboard Mode")
         elif self._mode == 'drum':
@@ -181,13 +191,16 @@ class Linnstrument(ControlSurface):
     def _update_keyboard_leds(self):
         """Update LEDs for keyboard mode"""
         try:
+            # ALWAYS clear ALL LEDs first when switching to keyboard mode
+            self.led_manager.clear_all(force=True)
+
             # Get scale settings
             root = self.song().root_note
             scale_name = self.song().scale_name
 
-            # Check if changed
-            if root == self.current_root and scale_name == self.current_scale:
-                return
+            # ALWAYS update when switching modes (don't skip if scale unchanged)
+            # if root == self.current_root and scale_name == self.current_scale:
+            #     return
 
             self.current_root = root
             self.current_scale = scale_name
@@ -204,8 +217,8 @@ class Linnstrument(ControlSurface):
             # Get scale notes
             scale_notes = get_scale_notes(root, our_scale_name)
 
-            # Clear and light
-            self.led_manager.clear_all()
+            # Light scale notes (already cleared above)
+            # self.led_manager.clear_all()
 
             for note in scale_notes:
                 positions = self.linnstrument.get_position_for_note(note)
@@ -229,14 +242,14 @@ class Linnstrument(ControlSurface):
                 self._logged_drum_pads = True
                 loaded_pads = []
                 for i in range(16):
-                    drum_note = 24 + i  # C1 = 24
+                    drum_note = 36 + i  # C2 = 36 (standard drum rack)
                     if drum_note < len(self._drum_rack.drum_pads):
                         drum_pad = self._drum_rack.drum_pads[drum_note]
                         if hasattr(drum_pad, 'chains') and len(drum_pad.chains) > 0:
                             loaded_pads.append(f"{i}(note{drum_note})")
                 self.log_message(f"Drum pads with samples: {loaded_pads}")
 
-            # Bottom 4 rows: 4x4 drum grid (pads 0-15, notes 24-39 = C1-D#3)
+            # Bottom 4 rows: 4x4 drum grid (pads 0-15, notes 36-51 = C2-D#3)
             for row in range(4):
                 for col in range(4):
                     pad_index = row * 4 + col
@@ -274,7 +287,7 @@ class Linnstrument(ControlSurface):
         # Check if pad has sample
         if self._drum_rack:
             try:
-                drum_note = 24 + pad_index  # C1 = 24
+                drum_note = 36 + pad_index  # C2 = 36 (standard drum rack)
                 if drum_note < len(self._drum_rack.drum_pads):
                     drum_pad = self._drum_rack.drum_pads[drum_note]
                     has_chains = hasattr(drum_pad, 'chains') and len(drum_pad.chains) > 0
@@ -289,65 +302,15 @@ class Linnstrument(ControlSurface):
 
 
     def build_midi_map(self, midi_map_handle):
-        """Forward notes only in drum mode for drum pads"""
-        if self._mode == 'drum':
-            # Forward drum pad notes (24-39 = C1-D#3) so we can intercept them
-            script_handle = self._c_instance.handle()
-            for note in range(24, 40):  # 16 pads
-                Live.MidiMap.forward_midi_note(script_handle, midi_map_handle, 0, note)
-        # In keyboard mode, don't forward - let all notes pass through
+        """Don't forward any notes - let them all pass through naturally"""
+        # Notes pass directly to Ableton tracks
+        pass
 
     def receive_midi(self, midi_bytes):
-        """Handle MIDI input"""
-        if len(midi_bytes) < 3:
-            return
-
-        status = midi_bytes[0]
-        data1 = midi_bytes[1]
-        data2 = midi_bytes[2]
-
-        # Only handle notes in drum mode
-        if self._mode != 'drum':
-            return
-
-        # Check for note on/off
-        if 0x80 <= status <= 0x9F:
-            note = data1
-            velocity = data2
-            is_note_on = (status & 0xF0) == 0x90 and velocity > 0
-
-            if not is_note_on:
-                return  # Only handle note-on
-
-            # Check if it's a drum pad (24-39 = C1-D#3)
-            if 24 <= note <= 39:
-                pad_index = note - 24
-                if pad_index < 16:
-                    # Select this pad
-                    if self._selected_pad != pad_index:
-                        self._selected_pad = pad_index
-                        # Schedule LED update for next update_display cycle
-                        self._needs_led_update = True
-
-                    # Re-send the note to play the drum sound (forwarded notes are intercepted)
-                    status = 0x90 if is_note_on else 0x80
-                    self._c_instance.send_midi((status, note, velocity))
-                    return
-
-            # Check if it's in sequencer area (rows 4-7)
-            positions = self.linnstrument.get_position_for_note(note)
-            for col, row in positions:
-                if row >= 4 and row < 8 and col < 16:
-                    # Sequencer step toggle
-                    step = col
-                    sequence = self._sequences[self._selected_pad]
-                    if sequence[step] > 0:
-                        sequence[step] = 0  # Turn off
-                    else:
-                        sequence[step] = 100  # Turn on
-                    # Schedule LED update (don't update in MIDI handler)
-                    self._needs_led_update = True
-                    return
+        """Handle MIDI input - currently unused, notes pass through naturally"""
+        # Notes go directly to Ableton tracks
+        # No interception needed
+        pass
 
     def update_display(self):
         """Called periodically - update LEDs if needed"""
