@@ -2,6 +2,13 @@
 
 This folder contains reference documentation for LinnStrument MIDI programming.
 
+## ✅ Status: ALL FEATURES WORKING (2025-11-19)
+
+- Keyboard mode with scale lighting
+- Drum mode with 4x4 pad grid + LED feedback
+- Automatic mode switching based on drum rack detection
+- LED clearing when switching between modes
+
 ## Quick Reference
 
 | Document | Purpose |
@@ -11,58 +18,67 @@ This folder contains reference documentation for LinnStrument MIDI programming.
 | [linnstrument_midi_spec.txt](./linnstrument_midi_spec.txt) | Official MIDI spec from LinnStrument firmware repo |
 | [user_firmware_mode.txt](./user_firmware_mode.txt) | User Firmware Mode documentation |
 
-## Key NRPN Values (Quick Ref)
+## ⚠️ Setup Requirement
+
+**IMPORTANT**: Configure your LinnStrument so the lower-left pad plays C2 (note 36):
+1. Press both "Per-Split Settings" buttons simultaneously (Global Settings)
+2. Navigate to: Per-Split Settings > Octave
+3. Adjust octave until lower-left pad plays C2
+4. This ensures drum pads align with Ableton's standard drum rack (notes 36-51)
+
+## Key NRPN Values (Current Implementation)
 
 ### Drum Mode Setup
 ```python
-# Enable LED control
-send_nrpn(245, 1)  # User Firmware Mode ON
+# Set 4x4 chromatic grid (4 semitones per row)
+send_nrpn(227, 4)  # Row offset = 4 semitones (major third)
 
-# Set 4x4 chromatic grid
-send_nrpn(227, 4)  # Row offset = 4 semitones
-send_nrpn(36, 4)   # Octave = -1 (shift C3 to C2)
+# NOTE: User Firmware Mode (NRPN 245) is NOT used
+# LED control (CC 20/21/22) works without it
+# Notes pass through naturally to Ableton
 ```
 
 ### Keyboard Mode Restore
 ```python
-send_nrpn(227, 5)  # Row offset = 5 semitones (fourths)
-send_nrpn(36, 5)   # Octave = 0 (default)
+# Restore fourths tuning for keyboard mode
+send_nrpn(227, 5)  # Row offset = 5 semitones (perfect fourth)
 ```
 
 ### Cleanup on Disconnect
 ```python
-send_nrpn(227, 5)  # Restore default row offset
-send_nrpn(36, 5)   # Restore default octave
-send_nrpn(245, 0)  # Disable User Firmware Mode
+# Restore default tuning
+send_nrpn(227, 5)  # Restore row offset to fifths
 ```
 
 ## Drum Mode Note Layout
 
-With `row_offset=4` and `octave=-1`:
+With `row_offset=4` (4 semitones per row) and LinnStrument octave set to C2:
 
 ```
 Row 3: [ 48] [ 49] [ 50] [ 51]  C3  C#3  D3  D#3  (Pads 12-15)
 Row 2: [ 44] [ 45] [ 46] [ 47]  G#2  A2  A#2  B2  (Pads 8-11)
 Row 1: [ 40] [ 41] [ 42] [ 43]  E2   F2  F#2  G2  (Pads 4-7)
 Row 0: [ 36] [ 37] [ 38] [ 39]  C2  C#2  D2  D#2  (Pads 0-3)
+        Col0  Col1  Col2  Col3
 ```
 
 Standard Ableton drum rack uses notes 36-51 for main 16 pads.
+**Note**: User must configure LinnStrument octave so lower-left pad = C2 (see Setup Requirement above)
 
 ## Troubleshooting
 
-**Problem**: Only top row lights up
-- Check `row_offset=4` and `octave=4` are sent correctly
-- Verify NRPN messages have all 6 CCs (99, 98, 6, 38, 101, 100)
+**Problem**: LEDs stay lit in wrong mode (drum LEDs persist in keyboard mode)
+- ✅ FIXED: LED clearing now forces update with `clear_all(force=True)`
+- Scale-change optimization removed to ensure LED updates on mode switch
 
-**Problem**: Mode switching stops after Global Settings
-- Global Settings disables User Firmware Mode
-- Re-send `NRPN 245=1` to re-enable
+**Problem**: Wrong octave / notes don't match drum rack
+- Configure LinnStrument Global Settings > Octave
+- Lower-left pad should play C2 (note 36)
+- Do NOT use NRPN 36 to change octave - it can cause side effects
 
-**Problem**: Wrong octave
-- Check LinnStrument's Global Settings > Octave
-- Should be set to make bottom-left play C2 (note 36)
-- Or use NRPN 36 to shift octave
+**Problem**: Mode not switching when changing tracks
+- ✅ FIXED: Track listener was always working correctly
+- Check logs for "=== TRACK CHANGED - checking mode ==="
 
 ## External Links
 - [LinnStrument Support](https://www.rogerlinndesign.com/support/linnstrument-getting-started)
