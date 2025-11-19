@@ -9,17 +9,13 @@
 - ✅ User Firmware Mode control for LED management
 
 ### Current Issues
-1. **Drum mode only lights top row** - DIAGNOSIS IN PROGRESS
-   - Symptoms: Only row 0 lights up, rows 1-3 don't respond
-   - Likely cause: Row offset NRPN not working as expected
-   - **Fix applied**: Using NRPN 227=4 (4 semitones) + NRPN 36=4 (-1 octave)
-   - Status: TESTING REQUIRED
+✅ **ALL CORE FEATURES WORKING** (2025-11-19)
 
-2. **Mode switching breaks after Global Settings**
-   - Symptoms: After user enters Global Settings on LinnStrument, mode switching stops working
-   - Root cause: Global Settings disables User Firmware Mode (NRPN 245)
-   - Current behavior: Script re-enables User Firmware Mode on init, but not after user exits Global Settings
-   - Potential fix: Periodically re-send NRPN 245=1, or detect when it gets disabled
+### Setup Requirement
+⚠️ **IMPORTANT**: User must configure LinnStrument hardware so lower-left pad plays C2 (note 36)
+   - Go to LinnStrument: Global Settings > Per-Split Settings > Octave
+   - Adjust octave until lower-left pad in drum mode plays C2
+   - This ensures drum pads align with Ableton's standard drum rack (notes 36-51)
 
 ## Implementation Details
 
@@ -88,16 +84,17 @@ Row 0: 36  37  38  39  (C2  C#2 D2  D#2) - Pads 0-3
    - Disable User Firmware Mode
 
 ### Testing Checklist
-- [ ] All 4 rows of drum pads light up
-- [ ] All 4 rows send MIDI notes
-- [ ] Pad colors match drum rack state:
+- ✅ All 4 rows of drum pads light up
+- ✅ All 4 rows send MIDI notes
+- ✅ Pad colors match drum rack state:
   - White: selected pad
   - Green: has sample
   - Off: no sample
-- [ ] Mode switches correctly when changing tracks
-- [ ] Mode persists after entering/exiting LinnStrument Global Settings
-- [ ] Keyboard mode works (scale lighting)
-- [ ] Script properly disconnects and restores settings
+- ✅ Mode switches correctly when changing tracks
+- ✅ LED clearing works when switching back to keyboard mode
+- ✅ Keyboard mode works (scale lighting)
+- ✅ Script properly disconnects and restores settings
+- ⚠️ User must set LinnStrument octave so lower-left = C2
 
 ## Known NRPN Pitfalls
 
@@ -150,12 +147,22 @@ Row 0: 36  37  38  39  (C2  C#2 D2  D#2) - Pads 0-3
 
 ### Quick Testing
 ```bash
+# CRITICAL: Clear Python cache BEFORE restarting Ableton
+# Otherwise old cached .pyc files will run instead of your changes!
+cd ~/Music/Ableton/User\ Library/Remote\ Scripts/LinnStrument/
+./clear_cache.sh
+
+# OR manually:
+find ~/Music/Ableton/User\ Library/Remote\ Scripts/LinnStrument -name "*.pyc" -delete
+find ~/Music/Ableton/User\ Library/Remote\ Scripts/LinnStrument -type d -name "__pycache__" -exec rm -rf {} +
+
 # Watch log in real-time
 tail -f ~/Library/Preferences/Ableton/Live\ 12.2.7/Log.txt | grep -i linnstrument
 
 # Reload script (restart Ableton required)
-# Changes to .py files require Ableton restart
-# Changes to NRPN logic show up in log
+# 1. Clear cache (see above)
+# 2. Restart Ableton
+# 3. Check log for new messages
 
 # Emergency disable User Firmware Mode
 python emergency_disable_user_mode.py
