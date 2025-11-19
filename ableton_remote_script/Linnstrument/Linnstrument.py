@@ -71,6 +71,9 @@ class Linnstrument(ControlSurface):
         # Mode state
         self._mode = 'keyboard'  # 'keyboard' or 'drum'
 
+        # Octave control
+        self._octave_offset = 0  # -5 to +5 (NRPN 36 values: 0-10, where 5=default)
+
         # Keyboard mode state
         self.current_root = None
         self.current_scale = None
@@ -105,6 +108,10 @@ class Linnstrument(ControlSurface):
         # Restore row offset to 5 (fifths)
         self._send_nrpn(227, 5)
         self.log_message("Restored row offset to 5 (fifths)")
+
+        # Restore octave to default (0)
+        self._send_nrpn(36, 5)
+        self.log_message("Restored octave to default (0)")
 
         # Remove listeners
         try:
@@ -301,16 +308,58 @@ class Linnstrument(ControlSurface):
         return 'off'  # No drum rack or no sample
 
 
+    def _shift_octave(self, direction):
+        """Shift octave up (+1) or down (-1)"""
+        # Update offset
+        new_offset = self._octave_offset + direction
+
+        # Clamp to valid range (-5 to +5)
+        new_offset = max(-5, min(5, new_offset))
+
+        if new_offset != self._octave_offset:
+            self._octave_offset = new_offset
+
+            # Convert to NRPN value (0-10, where 5=default)
+            nrpn_value = new_offset + 5
+
+            # Send NRPN to change octave
+            self._send_nrpn(36, nrpn_value)
+
+            # Show feedback
+            sign = "+" if new_offset > 0 else ""
+            self.show_message(f"Octave: {sign}{new_offset}")
+            self.log_message(f"Octave shifted to {sign}{new_offset} (NRPN 36 = {nrpn_value})")
+
     def build_midi_map(self, midi_map_handle):
-        """Don't forward any notes - let them all pass through naturally"""
+        """Forward switch CC messages so we can intercept them"""
+        # Forward Switch 1 and Switch 2 CC messages (65 and 66)
+        script_handle = self._c_instance.handle()
+        Live.MidiMap.forward_midi_cc(script_handle, midi_map_handle, 0, 65)  # Switch 1
+        Live.MidiMap.forward_midi_cc(script_handle, midi_map_handle, 0, 66)  # Switch 2
         # Notes pass directly to Ableton tracks
-        pass
 
     def receive_midi(self, midi_bytes):
-        """Handle MIDI input - currently unused, notes pass through naturally"""
-        # Notes go directly to Ableton tracks
-        # No interception needed
-        pass
+        """Handle MIDI input for octave switches"""
+        if len(midi_bytes) < 3:
+            return
+
+        status = midi_bytes[0]
+        data1 = midi_bytes[1]  # CC number or note
+        data2 = midi_bytes[2]  # CC value or velocity
+
+        # Check for CC messages (0xB0-0xBF)
+        if 0xB0 <= status <= 0xBF:
+            cc_num = data1
+            cc_value = data2
+
+            # Only respond to button press (value > 0)
+            if cc_value > 0:
+                # Switch 1 (left) = Octave Down (CC 65)
+                if cc_num == 65:
+                    self._shift_octave(-1)
+                # Switch 2 (right) = Octave Up (CC 66)
+                elif cc_num == 66:
+                    self._shift_octave(+1)
 
     def update_display(self):
         """Called periodically - update LEDs if needed"""
