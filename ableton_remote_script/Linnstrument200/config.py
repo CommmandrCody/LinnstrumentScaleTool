@@ -1,9 +1,11 @@
 """
 Configuration constants for LinnStrument multi-mode system
+Works with both LinnStrument 128 and LinnStrument 200
 """
 
 # LinnStrument Hardware Configuration
-LINNSTRUMENT_COLUMNS = 25  # LinnStrument 200
+# Set to your device: 16 for LinnStrument 128, 25 for LinnStrument 200
+LINNSTRUMENT_COLUMNS = 16  # Change to 25 for LinnStrument 200
 LINNSTRUMENT_ROWS = 8
 LINNSTRUMENT_BASE_NOTE = 36  # C2 - IMPORTANT: Adjust your LinnStrument's octave setting to match!
 LINNSTRUMENT_ROW_OFFSET = 5  # Semitones per row
@@ -28,17 +30,16 @@ MODE_COLORS = {
     MODE_DRUM: 'red',
 }
 
-# Drum Mode Configuration - Push-style layout
+# Drum Mode Configuration
 DRUM_PAD_ROWS = 4  # Bottom 4 rows (0-3) for drum pads
-DRUM_PAD_COLUMNS = 4  # 4x4 = 16 drum pads
-DRUM_PAD_EXTENDED_COLUMNS = 25  # Full width for duplicate detection (LinnStrument 200)
+DRUM_PAD_COLUMNS = 4  # 4x4 grid on left side (like Push)
+DRUM_PAD_EXTENDED_COLUMNS = LINNSTRUMENT_COLUMNS  # Can extend to show more pads
 SEQUENCER_ROWS = 4  # Top 4 rows (4-7) for sequencer
-SEQUENCER_COLUMNS = 8  # 8 columns for sequencer
-SEQUENCER_STEPS = 8  # 8 steps visible at once
+SEQUENCER_STEPS = LINNSTRUMENT_COLUMNS  # Full width of device
 
 # Session Mode Configuration
 SESSION_ROWS = 8  # Full grid height
-SESSION_COLUMNS = 25  # Full grid width (LinnStrument 200)
+SESSION_COLUMNS = LINNSTRUMENT_COLUMNS  # Full grid width
 SESSION_SCENE_LAUNCH_COLUMN = None  # Optional: column for scene launch
 
 # Keyboard Mode Configuration
@@ -52,3 +53,8 @@ DEFAULT_SCALE_COLOR = 'blue'
 NRPN_USER_FIRMWARE_MODE = 245
 NRPN_ENABLE_VALUE = 1
 NRPN_DISABLE_VALUE = 0
+
+# NRPN for Row Offset (chromatic vs. scale mode)
+NRPN_ROW_OFFSET = 6  # NRPN 6 controls row offset
+CHROMATIC_ROW_OFFSET = 1  # Chromatic (semitone per row)
+SCALE_ROW_OFFSET = 5  # Default scale mode (5 semitones per row)
