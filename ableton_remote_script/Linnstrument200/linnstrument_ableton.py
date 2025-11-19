@@ -2,8 +2,8 @@
 Linnstrument control using only Ableton's MIDI API (no external dependencies)
 """
 
-# Linnstrument 200: 25-column x 8-row grid
-LINNSTRUMENT_COLUMNS = 25
+# Linnstrument 200: 26-column x 8-row grid
+LINNSTRUMENT_COLUMNS = 26
 LINNSTRUMENT_ROWS = 8
 
 # Default tuning: each row is 5 semitones higher, columns are 1 semitone apart
@@ -110,7 +110,7 @@ class LinnstrumentAbletonMIDI:
         Set the color of a single LED cell
 
         Args:
-            column: Column number (0-15 for playable pads on Linnstrument 128)
+            column: Column number (0-25 for playable pads on Linnstrument 200)
             row: Row number (0-7)
             color: Color number (0-11) or color name string
         """
@@ -122,7 +122,7 @@ class LinnstrumentAbletonMIDI:
         status = 0xB0 + self.channel  # Control Change on channel
 
         # IMPORTANT: Linnstrument columns are 1-indexed for playable surface
-        # Column 0 = control buttons, Columns 1-16 = playable pads (Linnstrument 128)
+        # Column 0 = control buttons, Columns 1-26 = playable pads (Linnstrument 200)
         self.send_midi([status, 20, column + 1])  # Add 1 to skip control column
         self.send_midi([status, 21, row])
         self.send_midi([status, 22, color])
@@ -143,33 +143,24 @@ class LinnstrumentAbletonMIDI:
 
         return positions
 
-    def clear_all_lights(self, skip_top_row=False):
+    def clear_all_lights(self):
         """Turn off all LEDs"""
-        max_row = LINNSTRUMENT_ROWS - 1 if skip_top_row else LINNSTRUMENT_ROWS
-        for row in range(max_row):
+        for row in range(LINNSTRUMENT_ROWS):
             for column in range(LINNSTRUMENT_COLUMNS):
                 self.set_cell_color(column, row, 'off')
 
-    def light_note(self, note, color, skip_top_row=False):
+    def light_note(self, note, color):
         """Light up all cells that play a specific note"""
         positions = self.get_position_for_note(note)
 
-        # Debug: verify position calculation for root notes and B notes
-        note_name = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][note % 12]
-        if len(positions) > 0 and (note % 12 == 0 or note % 12 == 11):  # Log C and B notes
-            self.c_instance.log_message(f"Lighting note {note} ({note_name}) at positions: {positions[:3]}")
-            # Verify: what note do these positions actually play?
-            for col, row in positions[:2]:
-                calc_note = self.get_note_at_position(col, row)
-                self.c_instance.log_message(f"  Verify: position ({col},{row}) calculates to note {calc_note}")
+        # Debug: log first few root notes being lit
+        if len(positions) > 0 and note % 12 == 0:  # Log C notes
+            self.c_instance.log_message(f"Lighting note {note} (C) at positions: {positions[:3]}")
 
         for column, row in positions:
-            # Skip row 7 (top row) if requested
-            if skip_top_row and row == 7:
-                continue
             self.set_cell_color(column, row, color)
 
-    def light_scale(self, scale_notes, root_color='red', scale_color='blue', root_pitch_class=None, skip_top_row=False):
+    def light_scale(self, scale_notes, root_color='red', scale_color='blue'):
         """
         Light up all notes in a scale
 
@@ -177,46 +168,40 @@ class LinnstrumentAbletonMIDI:
             scale_notes: List of MIDI note numbers in the scale
             root_color: Color for root notes
             scale_color: Color for other scale notes
-            root_pitch_class: The actual root pitch class (0-11), if known
-            skip_top_row: If True, don't clear or light row 7 (reserved for track selection)
         """
-        # Clear all lights first (optionally skip top row)
-        self.clear_all_lights(skip_top_row=skip_top_row)
+        # Clear all lights first
+        self.clear_all_lights()
 
-        # Get root note pitch class
+        # Get root note (first note in scale)
         if not scale_notes:
             return
 
-        # Use provided root pitch class, or derive from first note
-        if root_pitch_class is not None:
-            root_note = root_pitch_class
-        else:
-            root_note = scale_notes[0] % 12
+        root_note = scale_notes[0] % 12
 
         # Debug logging
         c_instance = self.c_instance
-        c_instance.log_message(f"=== light_scale DEBUG ===")
-        c_instance.log_message(f"Root pitch class parameter: {root_note}")
-        c_instance.log_message(f"First scale note: {scale_notes[0]}")
-        c_instance.log_message(f"All scale notes to light: {scale_notes}")
+        c_instance.log_message(f"light_scale: First scale note = {scale_notes[0]}, root pitch class = {root_note}")
+        c_instance.log_message(f"light_scale: Total scale notes to light = {len(scale_notes)}")
 
-        # Check which notes are marked as roots
-        root_notes = [n for n in scale_notes if n % 12 == root_note]
-        c_instance.log_message(f"Notes that match root pitch class {root_note}: {root_notes}")
+        # Count how many positions we'll light
+        total_positions = 0
+        for note in scale_notes:
+            positions = self.get_position_for_note(note)
+            total_positions += len(positions)
+
+        c_instance.log_message(f"light_scale: Will light {total_positions} total pad positions")
 
         # Sample: show what note some positions play
-        c_instance.log_message(f"Grid verification:")
-        c_instance.log_message(f"  Position (0,0) plays: {self.get_note_at_position(0, 0)} (should be 36/C2)")
-        c_instance.log_message(f"  Position (1,0) plays: {self.get_note_at_position(1, 0)} (should be 37/C#2)")
-        c_instance.log_message(f"  Position (0,1) plays: {self.get_note_at_position(0, 1)} (should be 41/F2)")
-        c_instance.log_message(f"  Position (12,0) plays: {self.get_note_at_position(12, 0)} (should be 48/C3)")
+        c_instance.log_message(f"Position (0,0) plays note: {self.get_note_at_position(0, 0)}")
+        c_instance.log_message(f"Position (1,0) plays note: {self.get_note_at_position(1, 0)}")
+        c_instance.log_message(f"Position (0,1) plays note: {self.get_note_at_position(0, 1)}")
 
         # Light up each note in the scale
         for note in scale_notes:
             # Use root color for root notes, scale color for others
             is_root = (note % 12) == root_note
             color = root_color if is_root else scale_color
-            self.light_note(note, color, skip_top_row=skip_top_row)
+            self.light_note(note, color)
 
     def light_scale_with_degrees(self, scale_notes, color_map=None):
         """
